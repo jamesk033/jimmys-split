@@ -36,7 +36,7 @@ export function HistoryList({ sessions, units }: { sessions: SessionWithSets[]; 
                 </div>
                 <ul className="grid gap-0.5 text-[14px]">
                   {groupSets(s.sets).map((g) => {
-                    const done = g.sets.filter((x) => x.done && x.weight_lb !== null);
+                    const done = g.sets.filter((x) => (x.done || (x.reps ?? 0) > 0) && x.weight_lb !== null);
                     const top = done.sort((a, b) => (b.weight_lb ?? 0) - (a.weight_lb ?? 0))[0];
                     return (
                       <li key={g.key} className="flex justify-between gap-3">

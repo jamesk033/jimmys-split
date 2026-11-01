@@ -268,7 +268,7 @@ export function WorkoutEditor({
                         {s.done ? <IconCheck /> : s.set_no}
                       </button>
                       <NumField label={`Set ${s.set_no} weight in ${units}`} value={toUnit(s.weight_lb, units)} onChange={(v) => patchSet(s.id, { weight_lb: fromUnit(v, units) })} placeholder="0" className={cx(s.done && "border-win/30")} />
-                      <NumField label={`Set ${s.set_no} reps`} decimals={false} value={s.reps} onChange={(v) => patchSet(s.id, { reps: v })} placeholder={g.target || "0"} className={cx(s.done && "border-win/30")} />
+                      <NumField label={`Set ${s.set_no} reps`} decimals={false} value={s.reps} onChange={(v) => patchSet(s.id, { reps: v, done: v !== null && v > 0 ? true : s.done })} placeholder={g.target || "0"} className={cx(s.done && "border-win/30")} />
                       <button type="button" onClick={() => removeSet(s.id)} aria-label={`Remove set ${s.set_no}`} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-loss">
                         <IconX width={18} height={18} />
                       </button>
