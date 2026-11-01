@@ -23,8 +23,8 @@ type Template = {
   notes: { title: string; body: string; position: number }[];
 };
 
-/** First visit: copy the site owner's split, exercise list, checklists and key notes (never weights), or the built-in starter. */
-async function seed(supabase: ServerSupabase, userId: string) {
+/** Copy the site owner's split, exercise list, checklists and key notes (never weights), or the built-in starter. */
+export async function seedFromTemplate(supabase: ServerSupabase, userId: string) {
   const { data } = await supabase.rpc("lift_template");
   let t = (data ?? {}) as Partial<Template>;
   if (!t.days?.length || !t.exercises?.length) {
@@ -68,8 +68,7 @@ export const getContext = cache(async (): Promise<AppContext> => {
 
   let { data: row } = await supabase.from("lift_settings").select("*").eq("user_id", user.id).maybeSingle();
   if (!row) {
-    const { error } = await supabase.from("lift_settings").insert({ user_id: user.id });
-    if (!error) await seed(supabase, user.id);
+    await supabase.from("lift_settings").insert({ user_id: user.id });
     ({ data: row } = await supabase.from("lift_settings").select("*").eq("user_id", user.id).maybeSingle());
   }
   return {
@@ -77,7 +76,7 @@ export const getContext = cache(async (): Promise<AppContext> => {
     userId: user.id,
     email: user.email ?? "",
     username: (shared?.username as string | null) ?? null,
-    settings: { user_id: user.id, units: row?.units === "kg" ? "kg" : row?.units === "lb" ? "lb" : null, timezone: (row?.timezone as string) || DEFAULT_TZ },
+    settings: { user_id: user.id, units: row?.units === "kg" ? "kg" : row?.units === "lb" ? "lb" : null, timezone: (row?.timezone as string) || DEFAULT_TZ, setup: row?.setup === "template" || row?.setup === "own" ? row.setup : null },
   };
 });
 

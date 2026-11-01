@@ -1,7 +1,8 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { deleteDay, deleteExercise, reorder, saveDay, saveExercise, setDayExercises } from "@/app/actions/lift";
+import { deleteDay, deleteExercise, importSplit, reorder, saveDay, saveExercise, setDayExercises } from "@/app/actions/lift";
+import { parseSplit } from "@/lib/import";
 import type { Exercise, Units, WorkoutDay } from "@/lib/types";
 import { exerciseLabel } from "@/lib/types";
 import { fmtWeight, fromUnit, toUnit } from "@/lib/units";
@@ -198,6 +199,67 @@ function Rotation({ days, exercises, units, preview }: { days: WorkoutDay[]; exe
   );
 }
 
+// ---------- paste in a whole split ----------
+
+const EXAMPLE = `Upper 1
+Back - wide-grip lat pulldown - strap | 260 | 4-8
+Upper Chest - incline chest press - belt
+Side Delt - cable lateral raise
+
+Lower 1
+Quad - hack squat - belt, flat shoes | 390 | 4-6
+Hamstring - leg curl`;
+
+function ImportCard({ units, startOpen, preview }: { units: Units; startOpen: boolean; preview: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(startOpen);
+  const [text, setText] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
+  const parsed = parseSplit(text);
+  const count = parsed.reduce((t, d) => t + d.exercises.length, 0);
+  return (
+    <Card title="Paste in a split" action={<button type="button" onClick={() => setOpen((o) => !o)} className="text-[13px] text-accent">{open ? "Hide" : "Show"}</button>}>
+      {open ? (
+        <div className="grid gap-3">
+          <ul className="grid gap-1 text-[13px] text-muted">
+            <li>Day name on its own line, then one exercise per line. Leave a blank line between days.</li>
+            <li>
+              Exercise lines: <span className="text-ink">Muscle - Exercise - Equipment</span>. Only the exercise is required.
+            </li>
+            <li>
+              Optional weight ({units}) and rep range after a bar: <span className="text-ink">| 260 | 4-8</span>
+            </li>
+          </ul>
+          <Textarea aria-label="Your split" value={text} onChange={(e) => setText(e.target.value)} placeholder={EXAMPLE} className="min-h-56 font-mono text-[14px]" maxLength={20000} />
+          {text.trim() && (
+            <p className="text-[13px] text-muted">
+              Found {parsed.length} {parsed.length === 1 ? "day" : "days"}: {parsed.map((d) => `${d.name} (${d.exercises.length})`).join(", ")}. {count} exercises total.
+            </p>
+          )}
+          <Button
+            disabled={pending || !parsed.length || preview}
+            onClick={() =>
+              start(async () => {
+                const res = await importSplit(text);
+                if (!res.ok) return setMsg({ ok: false, text: res.error });
+                setMsg({ ok: true, text: `Added ${res.days} days and ${res.exercises} new exercises.` });
+                setText("");
+                router.refresh();
+              })
+            }
+          >
+            {pending ? "Importing…" : "Import"}
+          </Button>
+          {msg && <p className={cx("text-[13px]", msg.ok ? "text-win" : "text-loss")}>{msg.text}</p>}
+        </div>
+      ) : (
+        <p className="text-[14px] text-muted">Have your split written down somewhere? Paste the whole thing in at once.</p>
+      )}
+    </Card>
+  );
+}
+
 // ---------- exercise list ----------
 
 function ExerciseRow({ ex, units, onDelete, preview }: { ex: Exercise; units: Units; onDelete: () => void; preview: boolean }) {
@@ -342,7 +404,14 @@ export function SplitEditor({ days, exercises, units, preview = false }: { days:
           </button>
         ))}
       </div>
-      {tab === "days" ? <Rotation days={days} exercises={exercises} units={units} preview={preview} /> : <ExerciseList exercises={exercises} units={units} preview={preview} />}
+      {tab === "days" ? (
+        <>
+          <Rotation days={days} exercises={exercises} units={units} preview={preview} />
+          <ImportCard units={units} startOpen={!days.length} preview={preview} />
+        </>
+      ) : (
+        <ExerciseList exercises={exercises} units={units} preview={preview} />
+      )}
     </div>
   );
 }

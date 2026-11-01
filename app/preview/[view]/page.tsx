@@ -4,7 +4,7 @@ import { DashboardView } from "@/components/dashboard-view";
 import { HistoryList } from "@/components/history-list";
 import { Nav } from "@/components/nav";
 import { NotesEditor } from "@/components/notes-editor";
-import { UnitsPicker } from "@/components/settings-forms";
+import { SplitChoice, StartOverForm, UnitsPicker } from "@/components/settings-forms";
 import { SplitEditor } from "@/components/split-editor";
 import { StartWorkout } from "@/components/start-workout";
 import { WorkoutEditor } from "@/components/workout-editor";
@@ -43,6 +43,12 @@ export default async function Preview({ params, searchParams }: { params: Promis
         return <HistoryList sessions={d.sessions} units={units} />;
       case "calendar":
         return <CalendarView month={today.slice(0, 7)} today={today} sessions={d.sessions} />;
+      case "choice":
+        return <SplitChoice />;
+      case "split-empty":
+        return <SplitEditor days={[]} exercises={[]} units={units} preview />;
+      case "startover":
+        return <StartOverForm current="template" />;
       case "units":
         return <UnitsPicker current={null} first />;
       default:

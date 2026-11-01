@@ -2,9 +2,11 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getContext, getDays, getExercises } from "@/lib/data";
+import { getContext, getDays, getExercises, seedFromTemplate } from "@/lib/data";
+import { parseSplit } from "@/lib/import";
 import { setsFromDay } from "@/lib/lift";
 import { todayIn } from "@/lib/time";
+import { fromUnit } from "@/lib/units";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -53,6 +55,87 @@ export async function resetWorkouts(confirm: string): Promise<ActionResult> {
   const { error } = await ctx.supabase.from("lift_sessions").delete().eq("user_id", ctx.userId);
   revalidatePath("/", "layout");
   return fail(error);
+}
+
+// ---------- choosing a split ----------
+
+/** Wipes the split, exercise list, checklists and key notes. Workouts stay. */
+async function clearSplit(ctx: Awaited<ReturnType<typeof getContext>>) {
+  for (const t of ["lift_days", "lift_exercises", "lift_checklist_items", "lift_notes"] as const) {
+    const { error } = await ctx.supabase.from(t).delete().eq("user_id", ctx.userId);
+    if (error) return error;
+  }
+  return null;
+}
+
+/** After sign-up: copy Jimmy's split (days, exercises, notes, checklists; no weights) or start empty. */
+export async function chooseSplit(choice: "template" | "own"): Promise<ActionResult> {
+  if (choice !== "template" && choice !== "own") return { ok: false, error: "Pick one." };
+  const ctx = await getContext();
+  if (ctx.settings.setup) return { ok: true };
+  const err = await clearSplit(ctx);
+  if (err) return fail(err);
+  if (choice === "template") await seedFromTemplate(ctx.supabase, ctx.userId);
+  const { error } = await ctx.supabase.from("lift_settings").update({ setup: choice }).eq("user_id", ctx.userId);
+  revalidatePath("/", "layout");
+  return fail(error);
+}
+
+/** Settings: replace your split with Jimmy's, or wipe it to build your own. Workouts stay. */
+export async function startOver(choice: "template" | "own", confirm: string): Promise<ActionResult> {
+  if (choice !== "template" && choice !== "own") return { ok: false, error: "Pick one." };
+  if (confirm.trim().toUpperCase() !== "RESET") return { ok: false, error: "Type RESET to confirm." };
+  const ctx = await getContext();
+  const err = await clearSplit(ctx);
+  if (err) return fail(err);
+  if (choice === "template") await seedFromTemplate(ctx.supabase, ctx.userId);
+  const { error } = await ctx.supabase.from("lift_settings").update({ setup: choice }).eq("user_id", ctx.userId);
+  revalidatePath("/", "layout");
+  return fail(error);
+}
+
+/**
+ * Paste-in import: adds the days in order after any you already have. Exercises with a name
+ * already in your list are reused (and keep their weight unless the paste gives one).
+ */
+export async function importSplit(text: string): Promise<ActionResult & { days?: number; exercises?: number }> {
+  if (typeof text !== "string" || text.length > 20000) return { ok: false, error: "That's too long." };
+  const days = parseSplit(text);
+  if (!days.length) return { ok: false, error: "Nothing to import. Put the day name on the first line, then one exercise per line." };
+  if (days.length > 30) return { ok: false, error: "Up to 30 days at a time." };
+  const ctx = await getContext();
+  const existing = await getExercises(ctx);
+  const byName = new Map(existing.map((e) => [e.name.trim().toLowerCase(), e.id]));
+  let nextPos = Math.max(-1, ...existing.map((e) => e.position)) + 1;
+  let created = 0;
+  const { data: lastDay } = await ctx.supabase.from("lift_days").select("position").order("position", { ascending: false }).limit(1);
+  let dayPos = (lastDay?.[0]?.position ?? -1) + 1;
+  for (const d of days) {
+    const ids: string[] = [];
+    for (const x of d.exercises) {
+      const key = x.name.toLowerCase();
+      let id = byName.get(key);
+      if (!id) {
+        id = randomUUID();
+        const { error } = await ctx.supabase.from("lift_exercises").insert({ id, user_id: ctx.userId, muscle: x.muscle, name: x.name, equipment: x.equipment, sets: 1, reps: x.reps ?? "4-8", weight_lb: x.weight !== null ? fromUnit(x.weight, ctx.settings.units ?? "lb") : null, position: nextPos++ });
+        if (error) return fail(error);
+        byName.set(key, id);
+        created++;
+      } else if (x.weight !== null || x.reps) {
+        await ctx.supabase.from("lift_exercises").update({ ...(x.weight !== null ? { weight_lb: fromUnit(x.weight, ctx.settings.units ?? "lb") } : {}), ...(x.reps ? { reps: x.reps } : {}) }).eq("id", id);
+      }
+      ids.push(id);
+    }
+    const dayId = randomUUID();
+    const { error } = await ctx.supabase.from("lift_days").insert({ id: dayId, user_id: ctx.userId, name: d.name, position: dayPos++ });
+    if (error) return fail(error);
+    if (ids.length) {
+      const { error: e2 } = await ctx.supabase.from("lift_day_exercises").insert(ids.map((exercise_id, position) => ({ user_id: ctx.userId, day_id: dayId, exercise_id, position })));
+      if (e2) return fail(e2);
+    }
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, days: days.length, exercises: created };
 }
 
 // ---------- exercise list ----------

@@ -1,5 +1,5 @@
 import { Nav } from "@/components/nav";
-import { UnitsPicker, UsernameForm } from "@/components/settings-forms";
+import { SplitChoice, UnitsPicker, UsernameForm } from "@/components/settings-forms";
 import { getContext } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContext();
   const { data: live } = await ctx.supabase.from("lift_sessions").select("id").eq("status", "active").maybeSingle();
-  // After sign-up: pick a username (if missing), then lbs or kg.
-  const gate = !ctx.username ? <UsernameForm first /> : !ctx.settings.units ? <UnitsPicker current={null} first /> : null;
+  // After sign-up: pick a username (if missing), then lbs or kg, then Jimmy's split or your own.
+  const gate = !ctx.username ? <UsernameForm first /> : !ctx.settings.units ? <UnitsPicker current={null} first /> : !ctx.settings.setup ? <SplitChoice /> : null;
   return (
     <div className="lg:pl-56">
       <Nav live={!!live} email={ctx.username ? `@${ctx.username}` : ctx.email} />

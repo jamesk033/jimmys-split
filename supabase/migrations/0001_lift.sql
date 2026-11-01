@@ -188,3 +188,8 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public.lift_template() from public;
 grant execute on function public.lift_template() to authenticated;
+
+-- ---------- split choice after sign-up: copy Jimmy's split or build your own ----------
+alter table public.lift_settings add column if not exists setup text check (setup in ('template', 'own'));
+update public.lift_settings s set setup = 'own'
+where setup is null and exists (select 1 from public.lift_days d where d.user_id = s.user_id);

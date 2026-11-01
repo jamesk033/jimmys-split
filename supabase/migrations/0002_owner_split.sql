@@ -20,6 +20,7 @@ begin
   delete from public.lift_notes where user_id = owner;
   insert into public.lift_settings (user_id, units) values (owner, 'lb')
     on conflict (user_id) do update set units = coalesce(public.lift_settings.units, 'lb');
+  update public.lift_settings set setup = 'own' where user_id = owner;
 
   for r in select * from (values
     (0,'Back','Wide-grip lat pulldown','strap','4-8',260,'don''t lean back','weighted pullup - strap'),

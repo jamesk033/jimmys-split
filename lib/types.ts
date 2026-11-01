@@ -7,6 +7,8 @@ export interface LiftSettings {
   user_id: string;
   units: Units | null;
   timezone: string;
+  /** How they started: copied Jimmy's split, or built their own. Null until they pick. */
+  setup: "template" | "own" | null;
 }
 
 /** One lift in the exercise list. Weight lives here so it carries across every day that uses it. */

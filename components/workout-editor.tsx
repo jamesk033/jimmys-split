@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { deleteWorkout, finishWorkout, saveWorkout } from "@/app/actions/lift";
+import { deleteWorkout, finishWorkout, saveExercise, saveWorkout } from "@/app/actions/lift";
 import { groupSets, setsDone, shouldGoUp, volume, type Best } from "@/lib/lift";
 import { longDate } from "@/lib/time";
 import { type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
@@ -13,6 +13,84 @@ import { SaveBadge, useAutosave } from "./use-autosave";
 import { Badge, Button, Card, Empty, Input, Label, PageHeader, Progress, Textarea, buttonClass, cx } from "./ui";
 
 type Tab = "pre" | "workout" | "post" | "refuel";
+
+type Group = ReturnType<typeof groupSets>[number];
+
+/** Change an exercise mid-workout: details save to your exercise list; swap and remove only touch this workout. */
+function EditPanel({ g, ex, onSaved, onRename, onSwap, onRemove, onClose, preview }: { g: Group; ex?: Exercise; onSaved: (e: Exercise) => void; onRename: (name: string, target: string) => void; onSwap: (name: string) => void; onRemove: () => void; onClose: () => void; preview: boolean }) {
+  const [v, setV] = useState({ name: ex?.name ?? g.name, muscle: ex?.muscle ?? "", equipment: ex?.equipment ?? "", reps: ex?.reps ?? g.target, note: ex?.note ?? "", alternative: ex?.alternative ?? "" });
+  const [err, setErr] = useState("");
+  const [pending, start] = useTransition();
+  const save = () =>
+    start(async () => {
+      setErr("");
+      const name = v.name.trim() || g.name;
+      if (ex) {
+        const next = { ...ex, ...v, name };
+        const res = await saveExercise({ id: ex.id, muscle: next.muscle, name, equipment: next.equipment, sets: ex.sets, reps: next.reps, weight_lb: ex.weight_lb, note: next.note, alternative: next.alternative });
+        if (!res.ok) return setErr(res.error);
+        onSaved(next);
+      }
+      onRename(name, v.reps);
+      onClose();
+    });
+  return (
+    <div className="mb-3 grid gap-2 rounded-xl border border-accent/40 bg-bg p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="col-span-2 grid gap-1 text-[12px] text-muted">
+          Exercise
+          <Input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} maxLength={120} />
+        </label>
+        {ex && (
+          <>
+            <label className="grid gap-1 text-[12px] text-muted">
+              Muscle
+              <Input value={v.muscle} onChange={(e) => setV({ ...v, muscle: e.target.value })} maxLength={60} />
+            </label>
+            <label className="grid gap-1 text-[12px] text-muted">
+              Equipment
+              <Input value={v.equipment} onChange={(e) => setV({ ...v, equipment: e.target.value })} maxLength={120} />
+            </label>
+          </>
+        )}
+        <label className="grid gap-1 text-[12px] text-muted">
+          Rep range
+          <Input value={v.reps} onChange={(e) => setV({ ...v, reps: e.target.value })} maxLength={20} placeholder="4-8" />
+        </label>
+        {ex && (
+          <label className="grid gap-1 text-[12px] text-muted">
+            Alternative
+            <Input value={v.alternative} onChange={(e) => setV({ ...v, alternative: e.target.value })} maxLength={200} />
+          </label>
+        )}
+        {ex && (
+          <label className="col-span-2 grid gap-1 text-[12px] text-muted">
+            Notes
+            <Textarea value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} maxLength={500} className="min-h-16" />
+          </label>
+        )}
+      </div>
+      {ex && <p className="text-[12px] text-muted">Saves to your exercise list, so every day that uses it updates.</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={save} disabled={pending || preview}>
+          {pending ? "Saving…" : "Save"}
+        </Button>
+        {ex?.alternative && (
+          <Button variant="ghost" onClick={() => onSwap(ex.alternative)} disabled={preview}>
+            Swap to alternative today
+          </Button>
+        )}
+        <Button variant="danger" onClick={onRemove} disabled={preview}>
+          Remove from this workout
+        </Button>
+        <button type="button" onClick={onClose} className="min-h-11 px-2 text-[14px] text-muted">
+          Cancel
+        </button>
+      </div>
+      {err && <p className="text-[13px] text-loss">{err}</p>}
+    </div>
+  );
+}
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
@@ -83,6 +161,8 @@ export function WorkoutEditor({
   const [extra, setExtra] = useState("");
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
+  const [exList, setExList] = useState(split);
+  const [editing, setEditing] = useState<string | null>(null);
 
   const items = (k: ChecklistKind) => checklist.filter((c) => c.kind === k).sort((a, b) => a.position - b.position);
   const preItems = items("pre");
@@ -100,7 +180,8 @@ export function WorkoutEditor({
 
   const groups = groupSets(sets);
   const doneCount = setsDone(sets);
-  const splitById = new Map(split.map((e) => [e.id, e]));
+  const splitById = new Map(exList.map((e) => [e.id, e]));
+  const inGroup = (g: Group, s: SetRow) => s.position === g.position && s.name === g.name;
   const step = stepFor(units);
 
   const toggle = (list: string[], set: (v: string[]) => void, body: string) => set(list.includes(body) ? list.filter((b) => b !== body) : [...list, body]);
@@ -117,7 +198,7 @@ export function WorkoutEditor({
       });
     });
 
-  const addSet = (g: ReturnType<typeof groupSets>[number]) => {
+  const addSet = (g: Group) => {
     const last = g.sets[g.sets.length - 1];
     setSets((all) => [...all, { ...last, id: newId(), set_no: last.set_no + 1, done: false }]);
   };
@@ -245,8 +326,32 @@ export function WorkoutEditor({
                     {ex?.note && <p className="mt-1.5 text-[13px] leading-snug text-ink/80">{ex.note}</p>}
                     {ex?.alternative && <p className="mt-0.5 text-[12px] text-muted">Alt: {ex.alternative}</p>}
                   </div>
-                  {all && <Badge tone="win">Done</Badge>}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {all && <Badge tone="win">Done</Badge>}
+                    <button type="button" onClick={() => setEditing(editing === g.key ? null : g.key)} className="min-h-9 rounded-lg border border-line px-3 text-[13px] text-muted hover:text-ink">
+                      {editing === g.key ? "Close" : "Edit"}
+                    </button>
+                  </div>
                 </div>
+                {editing === g.key && (
+                  <EditPanel
+                    g={g}
+                    ex={ex}
+                    preview={preview}
+                    onClose={() => setEditing(null)}
+                    onSaved={(e) => setExList((l) => l.map((x) => (x.id === e.id ? e : x)))}
+                    onRename={(name, target) => setSets((all) => all.map((s) => (inGroup(g, s) ? { ...s, name, target_reps: target } : s)))}
+                    onSwap={(name) => {
+                      setSets((all) => all.map((s) => (inGroup(g, s) ? { ...s, name: name.slice(0, 120), exercise_id: null } : s)));
+                      setEditing(null);
+                    }}
+                    onRemove={() => {
+                      if (!confirm(`Remove ${g.name} from this workout?`)) return;
+                      setSets((all) => all.filter((s) => !inGroup(g, s)));
+                      setEditing(null);
+                    }}
+                  />
+                )}
 
                 <div className="grid grid-cols-[2.75rem_1fr_1fr_2.25rem] items-center gap-2 px-0.5 pb-1 text-[11px] uppercase tracking-wide text-muted">
                   <span>Set</span>
