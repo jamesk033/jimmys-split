@@ -143,7 +143,7 @@ begin
     ('pre','4 granules Baja Gold Celtic salt',4),
     ('pre','Painkillers, bathroom',5),
     ('pre','Music & mobility work',6),
-    ('pre','Perform 3 consecutive warmup sets before working set',7),
+    ('pre','Perform 2 consecutive warmup sets before working set',7),
     ('post','Foam roller',0),
     ('post','Static stretch entire body',1),
     ('post','Lax ball rollout',2),
