@@ -3,9 +3,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { deleteWorkout, finishWorkout, saveWorkout } from "@/app/actions/lift";
-import { groupSets, setsDone, volume, type Best } from "@/lib/lift";
+import { groupSets, setsDone, shouldGoUp, volume, type Best } from "@/lib/lift";
 import { longDate } from "@/lib/time";
-import { DAY_LABEL, type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
+import { type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight, fromUnit, stepFor, toUnit } from "@/lib/units";
 import { IconCheck, IconPlus, IconTrophy, IconX } from "./icons";
 import { NumField } from "./num-field";
@@ -55,15 +55,18 @@ export function WorkoutEditor({
   units,
   prs = [],
   justFinished = false,
+  nextName,
   preview = false,
 }: {
   session: SessionWithSets;
-  /** The lifter's exercises (for next-time weights). */
+  /** The exercise list (for notes and next-time weights). */
   split: Exercise[];
   checklist: ChecklistItem[];
   units: Units;
   prs?: Best[];
   justFinished?: boolean;
+  /** Next day in the rotation, shown after finishing. */
+  nextName?: string;
   preview?: boolean;
 }) {
   const router = useRouter();
@@ -164,7 +167,7 @@ export function WorkoutEditor({
     <div className="grid gap-4">
       <PageHeader
         eyebrow={live ? "Workout in progress" : longDate(date)}
-        title={`${DAY_LABEL[session.day]} day`}
+        title={session.day_name || "Workout"}
         sub={`${doneCount} of ${sets.length} sets done · ${fmtBig(volume(sets), units)} moved`}
         action={!preview && <SaveBadge state={save.state} error={save.error} />}
       />
@@ -172,7 +175,7 @@ export function WorkoutEditor({
       {justFinished && (
         <Card className="border-win/40 bg-win/5">
           <div className="text-[20px] font-bold text-win">Workout done. Rest up.</div>
-          <p className="mt-1 text-[14px] text-muted">Next up is {DAY_LABEL[session.day === "upper" ? "lower" : "upper"]} whenever you&apos;re ready.</p>
+          {nextName && <p className="mt-1 text-[14px] text-muted">Next up is {nextName} whenever you&apos;re ready.</p>}
         </Card>
       )}
 
@@ -221,15 +224,26 @@ export function WorkoutEditor({
           {groups.map((g) => {
             const ex = g.exerciseId ? splitById.get(g.exerciseId) : undefined;
             const all = g.sets.every((s) => s.done);
+            const hit = g.sets.find((s) => s.done && shouldGoUp(g.target, s.reps));
             return (
               <Card key={g.key} className={cx(all && "border-win/40")}>
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
+                    {ex?.muscle && <div className="text-[12px] font-semibold uppercase tracking-wide text-accent">{ex.muscle}</div>}
                     <h2 className="text-[17px] font-semibold">{g.name}</h2>
                     <div className="text-[13px] text-muted">
-                      {g.sets.length} sets{g.target ? ` x ${g.target}` : ""}
-                      {ex?.note ? ` · ${ex.note}` : ""}
+                      {g.sets.length} {g.sets.length === 1 ? "set" : "sets"}
+                      {g.target ? ` x ${g.target}` : ""}
                     </div>
+                    {ex?.equipment && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {ex.equipment.split(",").map((q) => (
+                          <Badge key={q}>{q.trim()}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    {ex?.note && <p className="mt-1.5 text-[13px] leading-snug text-ink/80">{ex.note}</p>}
+                    {ex?.alternative && <p className="mt-0.5 text-[12px] text-muted">Alt: {ex.alternative}</p>}
                   </div>
                   {all && <Badge tone="win">Done</Badge>}
                 </div>
@@ -262,6 +276,11 @@ export function WorkoutEditor({
                   ))}
                 </ul>
 
+                {hit && (
+                  <p className="mt-3 rounded-lg bg-win/10 px-3 py-2 text-[13px] font-semibold text-win">
+                    Hit {hit.reps} reps. Go up next time.
+                  </p>
+                )}
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
                   <button type="button" onClick={() => addSet(g)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-[14px] font-semibold text-accent">
                     <IconPlus width={18} height={18} /> Set

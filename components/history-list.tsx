@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { groupSets, setsDone, volume } from "@/lib/lift";
 import { longDate, minutesBetween } from "@/lib/time";
-import { DAY_LABEL, type SessionWithSets, type Units } from "@/lib/types";
+import { isLower, type SessionWithSets, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight } from "@/lib/units";
 import { Badge, Card, Empty } from "./ui";
 
@@ -12,13 +12,20 @@ export function HistoryList({ sessions, units }: { sessions: SessionWithSets[]; 
     <ul className="grid gap-3">
       {sessions.map((s) => {
         const mins = minutesBetween(s.started_at, s.finished_at);
+        if (s.rest)
+          return (
+            <li key={s.id} className="flex items-center gap-2 rounded-2xl border border-dashed border-line px-4 py-3 text-[14px] text-muted">
+              <Badge>Rest</Badge>
+              {longDate(s.date)}
+            </li>
+          );
         return (
           <li key={s.id}>
             <Link href={`/history/${s.id}`} className="block rounded-2xl transition hover:ring-1 hover:ring-accent/50">
               <Card>
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Badge tone={s.day === "upper" ? "accent" : "win"}>{DAY_LABEL[s.day]}</Badge>
+                    <Badge tone={isLower(s.day_name) ? "win" : "accent"}>{s.day_name || "Workout"}</Badge>
                     <span className="font-semibold">{longDate(s.date)}</span>
                     {s.status === "active" && <Badge tone="warn">In progress</Badge>}
                   </div>

@@ -27,16 +27,16 @@ export default async function Preview({ params, searchParams }: { params: Promis
     switch (view) {
       case "home":
         return (
-          <DashboardView name="@ICT_Jimmy" summary={summarize(all, today)} next={nextDay(d.sessions)} nextCount={6} live={null} recent={d.sessions.slice(0, 5)} bests={allTimeBests(all)} series={Object.fromEntries(loggedNames(all).map((n) => [n, progressFor(all, n)]))} units={units} />
+          <DashboardView name="@ICT_Jimmy" summary={summarize(all, today)} next={nextDay(d.sessions, d.days)?.name ?? null} nextCount={nextDay(d.sessions, d.days)?.exerciseIds.length ?? 0} live={null} recent={d.sessions.slice(0, 5)} bests={allTimeBests(all)} series={Object.fromEntries(loggedNames(all).map((n) => [n, progressFor(all, n)]))} units={units} />
         );
       case "start":
-        return <StartWorkout suggested={nextDay(d.sessions)} exercises={d.exercises} units={units} lastDate={d.sessions[0].date} preview />;
+        return <StartWorkout next={nextDay(d.sessions, d.days)} days={d.days} exercises={d.exercises} units={units} restToday={false} preview />;
       case "workout":
         return <WorkoutEditor session={d.live} split={d.exercises} checklist={d.checklist} units={units} preview />;
       case "done":
-        return <WorkoutEditor session={d.sessions[0]} split={d.exercises} checklist={d.checklist} units={units} prs={prsIn(d.sessions[0], all)} justFinished preview />;
+        return <WorkoutEditor session={d.sessions[0]} split={d.exercises} checklist={d.checklist} units={units} prs={prsIn(d.sessions[0], all)} justFinished nextName={nextDay(d.sessions, d.days)?.name} preview />;
       case "split":
-        return <SplitEditor exercises={d.exercises} units={units} preview />;
+        return <SplitEditor days={d.days} exercises={d.exercises} units={units} preview />;
       case "notes":
         return <NotesEditor notes={d.notes} checklist={d.checklist} preview />;
       case "history":

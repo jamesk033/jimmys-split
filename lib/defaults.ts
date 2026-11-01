@@ -1,33 +1,31 @@
-import type { ChecklistKind, Day } from "./types";
+import type { ChecklistKind } from "./types";
 
-/** Used for a brand-new account only when the site owner hasn't set up a template yet. Everything is editable. */
-export const DEFAULT_EXERCISES: { day: Day; name: string; sets: number; reps: string; note: string }[] = [
-  { day: "upper", name: "Bench press", sets: 3, reps: "6-8", note: "" },
-  { day: "upper", name: "Barbell row", sets: 3, reps: "8-10", note: "" },
-  { day: "upper", name: "Overhead press", sets: 3, reps: "8-10", note: "" },
-  { day: "upper", name: "Pull-ups", sets: 3, reps: "8-12", note: "" },
-  { day: "upper", name: "Curls", sets: 3, reps: "10-12", note: "" },
-  { day: "upper", name: "Triceps pushdown", sets: 3, reps: "10-12", note: "" },
-  { day: "lower", name: "Squat", sets: 3, reps: "5-8", note: "" },
-  { day: "lower", name: "Romanian deadlift", sets: 3, reps: "8-10", note: "" },
-  { day: "lower", name: "Leg press", sets: 3, reps: "10-12", note: "" },
-  { day: "lower", name: "Leg curl", sets: 3, reps: "10-12", note: "" },
-  { day: "lower", name: "Calf raises", sets: 3, reps: "12-15", note: "" },
+/**
+ * Starter split for a new account, only used if the site owner hasn't set one up.
+ * Normally new accounts copy the owner's split (without weights) through lift_template().
+ */
+export const DEFAULT_EXERCISES: { muscle: string; name: string; equipment: string; sets: number; reps: string; note: string; alternative: string }[] = [
+  { muscle: "Back", name: "Lat pulldown", equipment: "", sets: 1, reps: "4-8", note: "", alternative: "" },
+  { muscle: "Chest", name: "Incline chest press", equipment: "", sets: 1, reps: "4-8", note: "", alternative: "" },
+  { muscle: "Side Delt", name: "Lateral raise", equipment: "", sets: 1, reps: "4-8", note: "", alternative: "" },
+  { muscle: "Quad", name: "Hack squat", equipment: "", sets: 1, reps: "4-6", note: "", alternative: "" },
+  { muscle: "Hamstring", name: "Leg curl", equipment: "", sets: 1, reps: "4-8", note: "", alternative: "" },
+  { muscle: "Calf", name: "Standing calf raise", equipment: "", sets: 1, reps: "4-8", note: "", alternative: "" },
+];
+
+/** Day name and indexes into DEFAULT_EXERCISES. */
+export const DEFAULT_DAYS: { name: string; exercises: number[] }[] = [
+  { name: "Upper", exercises: [0, 1, 2] },
+  { name: "Lower", exercises: [3, 4, 5] },
 ];
 
 export const DEFAULT_CHECKLIST: { kind: ChecklistKind; body: string }[] = [
-  { kind: "pre", body: "Water bottle filled" },
-  { kind: "pre", body: "Pre-workout meal or snack" },
-  { kind: "pre", body: "Warm-up done" },
-  { kind: "post", body: "Cool down and stretch" },
-  { kind: "post", body: "Weights for next time updated" },
-  { kind: "refuel", body: "Protein within 2 hours" },
-  { kind: "refuel", body: "Carbs with the meal" },
-  { kind: "refuel", body: "Rehydrate" },
+  { kind: "pre", body: "Warm-up sets done" },
+  { kind: "post", body: "Stretch" },
+  { kind: "refuel", body: "Protein and carbs" },
 ];
 
 export const DEFAULT_NOTES: { title: string; body: string }[] = [
-  { title: "Equipment", body: "" },
-  { title: "How the split works", body: "Upper / Lower, repeat forever. Rest when needed. The next workout is always the opposite of the last one you finished." },
-  { title: "How to do the sets", body: "" },
+  { title: "How the split works", body: "Run the days in order, then start over. Rest when needed. The next workout is always the day after the last one you logged." },
+  { title: "Necessary equipment", body: "" },
 ];

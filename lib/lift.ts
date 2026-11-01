@@ -1,14 +1,23 @@
 import { addDays, weekStart } from "./time";
-import type { Day, Exercise, Session, SessionWithSets, SetRow } from "./types";
+import type { Exercise, Session, SessionWithSets, SetRow, WorkoutDay } from "./types";
 
-/** Upper / Lower x infinity: the next day is the opposite of the last finished workout. Rest days don't change it. */
-export function nextDay(sessions: Pick<Session, "day" | "status" | "date" | "started_at">[]): Day {
-  const done = sessions.filter((s) => s.status === "done").sort((a, b) => (b.date + b.started_at).localeCompare(a.date + a.started_at));
-  if (!done.length) return "upper";
-  return done[0].day === "upper" ? "lower" : "upper";
+/** Finished workouts, not rest days. */
+export const isWorkout = (s: Pick<Session, "status" | "rest">) => s.status === "done" && !s.rest;
+
+/**
+ * The rotation: the next day is the one after the last workout you logged, wrapping back to the first.
+ * Rest days don't move it. A workout whose day was deleted is matched by name.
+ */
+export function nextDay(sessions: Pick<Session, "day_id" | "day_name" | "status" | "rest" | "date" | "started_at">[], days: WorkoutDay[]): WorkoutDay | null {
+  const order = [...days].sort((a, b) => a.position - b.position);
+  if (!order.length) return null;
+  const done = sessions.filter(isWorkout).sort((a, b) => (b.date + b.started_at).localeCompare(a.date + a.started_at));
+  for (const s of done) {
+    const i = order.findIndex((d) => d.id === s.day_id || (!s.day_id && d.name === s.day_name));
+    if (i >= 0) return order[(i + 1) % order.length];
+  }
+  return order[0];
 }
-
-export const otherDay = (d: Day): Day => (d === "upper" ? "lower" : "upper");
 
 /** First number in a rep target: "8-10" -> 8, "5" -> 5, "AMRAP" -> null. */
 export function firstReps(target: string): number | null {
@@ -16,6 +25,20 @@ export function firstReps(target: string): number | null {
   if (!m) return null;
   const n = Number(m[0]);
   return n > 0 && n <= 200 ? n : null;
+}
+
+/** Last number in a rep target: "4-8" -> 8. */
+export function topReps(target: string): number | null {
+  const all = target.match(/\d+/g);
+  if (!all) return null;
+  const n = Number(all[all.length - 1]);
+  return n > 0 && n <= 200 ? n : null;
+}
+
+/** Progressive overload: beat the top of the range (9 on 4-8) and it's time to go up. */
+export function shouldGoUp(target: string, reps: number | null): boolean {
+  const top = topReps(target);
+  return top !== null && reps !== null && reps > top;
 }
 
 /** Estimated one-rep max (Epley). Only sets of 1 to 12 reps count; past that the guess gets loose. */
@@ -60,7 +83,7 @@ export function bestsIn(session: SessionWithSets): Map<string, Best> {
 export function allTimeBests(sessions: SessionWithSets[]): Best[] {
   const out = new Map<string, Best>();
   for (const s of sessions) {
-    if (s.status !== "done") continue;
+    if (!isWorkout(s)) continue;
     for (const [k, b] of bestsIn(s)) {
       const cur = out.get(k);
       if (!cur || b.e1rm > cur.e1rm) out.set(k, b);
@@ -71,7 +94,7 @@ export function allTimeBests(sessions: SessionWithSets[]): Best[] {
 
 /** New estimated-max records set in this workout, compared with every earlier workout. First time doing a lift isn't a PR. */
 export function prsIn(session: SessionWithSets, all: SessionWithSets[]): Best[] {
-  const earlier = all.filter((s) => s.id !== session.id && s.status === "done" && (s.date + s.started_at).localeCompare(session.date + session.started_at) < 0);
+  const earlier = all.filter((s) => s.id !== session.id && isWorkout(s) && (s.date + s.started_at).localeCompare(session.date + session.started_at) < 0);
   const before = new Map<string, number>();
   for (const s of earlier) for (const [k, b] of bestsIn(s)) before.set(k, Math.max(before.get(k) ?? 0, b.e1rm));
   const prs: Best[] = [];
@@ -86,7 +109,7 @@ export function prsIn(session: SessionWithSets, all: SessionWithSets[]): Best[] 
 export function progressFor(sessions: SessionWithSets[], name: string): { date: string; e1rm: number; top: number }[] {
   const key = name.trim().toLowerCase();
   return sessions
-    .filter((s) => s.status === "done")
+    .filter(isWorkout)
     .map((s) => ({ s, b: bestsIn(s).get(key) }))
     .filter((x) => x.b)
     .sort((a, b) => a.s.date.localeCompare(b.s.date))
@@ -112,7 +135,7 @@ export interface Summary {
 }
 
 export function summarize(sessions: SessionWithSets[], today: string): Summary {
-  const done = sessions.filter((s) => s.status === "done");
+  const done = sessions.filter(isWorkout);
   const wk = weekStart(today);
   const month = today.slice(0, 7);
   const weeks = new Set(done.map((s) => weekStart(s.date)));
@@ -123,7 +146,7 @@ export function summarize(sessions: SessionWithSets[], today: string): Summary {
     cursor = addDays(cursor, -7);
   }
   const byDate = [...done].sort((a, b) => b.date.localeCompare(a.date));
-  const bw = byDate.find((s) => s.bodyweight_lb !== null);
+  const bw = [...sessions].filter((s) => s.status === "done").sort((a, b) => b.date.localeCompare(a.date)).find((s) => s.bodyweight_lb !== null);
   const last = byDate[0]?.date;
   return {
     thisWeek: done.filter((s) => s.date >= wk && s.date <= today).length,
@@ -136,17 +159,17 @@ export function summarize(sessions: SessionWithSets[], today: string): Summary {
   };
 }
 
-/** Fresh sets for a new workout from the split, at each exercise's current weight. */
-export function setsFromSplit(exercises: Exercise[], day: Day, sessionId: string, makeId: () => string): SetRow[] {
+/** Fresh sets for a new workout from one day of the split, at each exercise's current weight. */
+export function setsFromDay(day: WorkoutDay, exercises: Exercise[], sessionId: string, makeId: () => string): SetRow[] {
+  const byId = new Map(exercises.map((e) => [e.id, e]));
   const out: SetRow[] = [];
-  exercises
-    .filter((e) => e.day === day)
-    .sort((a, b) => a.position - b.position)
-    .forEach((e, i) => {
-      for (let n = 1; n <= e.sets; n++) {
-        out.push({ id: makeId(), session_id: sessionId, exercise_id: e.id, name: e.name, target_reps: e.reps, position: i, set_no: n, weight_lb: e.weight_lb, reps: firstReps(e.reps), done: false });
-      }
-    });
+  day.exerciseIds.forEach((id, i) => {
+    const e = byId.get(id);
+    if (!e) return;
+    for (let n = 1; n <= e.sets; n++) {
+      out.push({ id: makeId(), session_id: sessionId, exercise_id: e.id, name: e.name, target_reps: e.reps, position: i, set_no: n, weight_lb: e.weight_lb, reps: null, done: false });
+    }
+  });
   return out;
 }
 

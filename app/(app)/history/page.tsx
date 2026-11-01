@@ -10,7 +10,7 @@ export default async function HistoryPage() {
   const sessions = await getSessions(ctx);
   return (
     <>
-      <PageHeader title="History" sub={`${sessions.filter((s) => s.status === "done").length} workouts`} />
+      <PageHeader title="History" sub={`${sessions.filter((s) => s.status === "done" && !s.rest).length} workouts`} />
       <HistoryList sessions={sessions} units={ctx.settings.units ?? "lb"} />
     </>
   );

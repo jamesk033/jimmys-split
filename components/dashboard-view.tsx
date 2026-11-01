@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { Best, Summary } from "@/lib/lift";
 import { setsDone, volume } from "@/lib/lift";
 import { shortDate } from "@/lib/time";
-import { DAY_LABEL, type Day, type SessionWithSets, type Units } from "@/lib/types";
+import { isLower, type SessionWithSets, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight } from "@/lib/units";
 import { IconCalendarDay, IconDumbbell, IconFlame, IconScale, IconTrendUp, IconTrophy } from "./icons";
 import { ProgressChart, type ProgressSeries } from "./progress-chart";
@@ -24,7 +24,7 @@ export function DashboardView({
   name: string;
   verse?: ReactNode;
   summary: Summary;
-  next: Day;
+  next: string | null;
   nextCount: number;
   live: SessionWithSets | null;
   recent: SessionWithSets[];
@@ -46,7 +46,7 @@ export function DashboardView({
       >
         <div className="min-w-0">
           <div className="text-[13px] font-semibold uppercase tracking-wider text-muted">{live ? "In progress" : "Next up"}</div>
-          <div className="mt-0.5 text-[26px] font-bold leading-tight">{live ? `${DAY_LABEL[live.day]} day` : `${DAY_LABEL[next]} day`}</div>
+          <div className="mt-0.5 text-[26px] font-bold leading-tight">{live ? live.day_name : (next ?? "Set up your split")}</div>
           <div className="mt-1 text-[14px] text-muted">
             {live
               ? `${setsDone(live.sets)} of ${live.sets.length} sets done. Tap to keep going.`
@@ -102,11 +102,11 @@ export function DashboardView({
               <li key={s.id}>
                 <Link href={`/history/${s.id}`} className="flex items-center justify-between gap-3 py-2.5 hover:text-accent">
                   <span className="flex items-center gap-2">
-                    <Badge tone={s.day === "upper" ? "accent" : "win"}>{DAY_LABEL[s.day]}</Badge>
+                    <Badge tone={s.rest ? "neutral" : isLower(s.day_name) ? "win" : "accent"}>{s.day_name || "Workout"}</Badge>
                     <span>{shortDate(s.date)}</span>
                   </span>
                   <span className="text-[14px] text-muted">
-                    {setsDone(s.sets)} sets · {fmtBig(volume(s.sets), units)}
+                    {s.rest ? "Rest day" : `${setsDone(s.sets)} sets · ${fmtBig(volume(s.sets), units)}`}
                   </span>
                 </Link>
               </li>

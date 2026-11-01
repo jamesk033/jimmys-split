@@ -40,14 +40,18 @@ describe("lift schema", () => {
   });
 
   it("keeps each lifter's rows private", async () => {
-    await as(A, `insert into lift_exercises (day, name, weight_lb) values ('upper', 'Bench', 315)`);
+    await as(A, `insert into lift_exercises (id, name, weight_lb) values ('eeeeeeee-0000-4000-8000-000000000001', 'Bench', 315)`);
+    await as(A, `insert into lift_days (id, name) values ('dddddddd-0000-4000-8000-000000000001', 'Test day')`);
+    await as(A, `insert into lift_day_exercises (day_id, exercise_id) values ('dddddddd-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000001')`);
     expect((await as(B, `select * from lift_exercises`)).rows).toHaveLength(0);
-    await expect(as(B, `insert into lift_exercises (user_id, day, name) values ('${A}', 'upper', 'Sneaky')`)).rejects.toThrow();
+    await expect(as(B, `insert into lift_exercises (user_id, name) values ('${A}', 'Sneaky')`)).rejects.toThrow();
+    await as(B, `insert into lift_days (id, name) values ('dddddddd-0000-4000-8000-000000000002', 'Mine')`);
+    await expect(as(B, `insert into lift_day_exercises (day_id, exercise_id) values ('dddddddd-0000-4000-8000-000000000002', 'eeeeeeee-0000-4000-8000-000000000001')`)).rejects.toThrow();
   });
 
   it("allows one workout in progress at a time", async () => {
-    await as(A, `insert into lift_sessions (id, date, day) values ('aaaaaaaa-0000-4000-8000-000000000001', '2026-11-01', 'upper')`);
-    await expect(as(A, `insert into lift_sessions (date, day) values ('2026-11-01', 'lower')`)).rejects.toThrow();
+    await as(A, `insert into lift_sessions (id, date, day_name) values ('aaaaaaaa-0000-4000-8000-000000000001', '2026-11-01', 'A Upper 1')`);
+    await expect(as(A, `insert into lift_sessions (date, day_name) values ('2026-11-01', 'A Lower 1')`)).rejects.toThrow();
   });
 
   it("won't let someone add sets to another lifter's workout", async () => {
@@ -59,10 +63,29 @@ describe("lift schema", () => {
   it("shares the owner's template without weights", async () => {
     await as(A, `insert into lift_checklist_items (kind, body) values ('pre', 'Chalk')`);
     const r = await as(B, `select lift_template() as t`);
-    const t = (r.rows[0] as { t: { exercises: Record<string, unknown>[]; checklist: unknown[] } }).t;
+    const t = (r.rows[0] as { t: { exercises: Record<string, unknown>[]; days: unknown[]; items: unknown[]; checklist: unknown[] } }).t;
     expect(t.exercises[0].name).toBe("Bench");
+    expect(t.days).toHaveLength(1);
+    expect(t.items).toHaveLength(1);
     expect(t.exercises[0]).not.toHaveProperty("weight_lb");
     expect(t.checklist).toHaveLength(1);
+  });
+
+  it("loads the owner split once, with weights only on the owner", async () => {
+    const owner = readFileSync(path.join(__dirname, "../supabase/migrations/0002_owner_split.sql"), "utf8");
+    await db.exec(owner);
+    await db.exec(owner);
+    const days = await as(A, `select name from lift_days order by position`);
+    expect(days.rows.map((r) => (r as { name: string }).name)).toEqual(["A Upper 1", "A Lower 1", "A Upper 2", "A Lower 2", "B Upper 1", "B Lower 1", "B Upper 2", "B Lower 2"]);
+    const items = await as(A, `select count(*)::int as n from lift_day_exercises`);
+    expect((items.rows[0] as { n: number }).n).toBe(9 + 7 + 9 + 8 + 9 + 7 + 9 + 8);
+    const rdl = await as(A, `select weight_lb::float as w, reps from lift_exercises where name = 'RDL'`);
+    expect(rdl.rows[0]).toEqual({ w: 415, reps: "4-6" });
+    const tpl = await as(B, `select lift_template() as t`);
+    const t = (tpl.rows[0] as { t: { exercises: Record<string, unknown>[]; days: unknown[] } }).t;
+    expect(t.days).toHaveLength(8);
+    expect(t.exercises.some((e) => "weight_lb" in e)).toBe(false);
+    expect((await as(B, `select * from lift_exercises where name = 'RDL'`)).rows).toHaveLength(0);
   });
 
   it("rejects units other than lb or kg", async () => {

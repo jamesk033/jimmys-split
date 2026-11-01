@@ -2,14 +2,13 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getContext, getExercises } from "@/lib/data";
-import { setsFromSplit } from "@/lib/lift";
+import { getContext, getDays, getExercises } from "@/lib/data";
+import { setsFromDay } from "@/lib/lift";
 import { todayIn } from "@/lib/time";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
 const uuid = z.string().uuid();
-const day = z.enum(["upper", "lower"]);
 const lb = z.number().finite().min(0).max(5000).nullable();
 const fail = (e: { message: string } | null | undefined, fallback = "Couldn't save. Try again."): ActionResult => (e ? { ok: false, error: e.message || fallback } : { ok: true });
 
@@ -47,7 +46,7 @@ export async function setUsername(raw: string): Promise<ActionResult> {
   return fail(error);
 }
 
-/** Deletes every workout. The split, checklists and key notes stay. */
+/** Deletes every workout and rest day. The split, checklists and key notes stay. */
 export async function resetWorkouts(confirm: string): Promise<ActionResult> {
   if (confirm.trim().toUpperCase() !== "DELETE") return { ok: false, error: 'Type DELETE to confirm.' };
   const ctx = await getContext();
@@ -56,16 +55,18 @@ export async function resetWorkouts(confirm: string): Promise<ActionResult> {
   return fail(error);
 }
 
-// ---------- the split ----------
+// ---------- exercise list ----------
 
 const exerciseSchema = z.object({
   id: uuid.optional(),
-  day,
-  name: z.string().trim().min(1, "Name the exercise.").max(80),
+  muscle: z.string().trim().max(60),
+  name: z.string().trim().min(1, "Name the exercise.").max(120),
+  equipment: z.string().trim().max(120),
   sets: z.number().int().min(1).max(20),
   reps: z.string().trim().max(20),
   weight_lb: lb,
-  note: z.string().max(300),
+  note: z.string().max(500),
+  alternative: z.string().max(200),
 });
 
 export async function saveExercise(raw: unknown): Promise<ActionResult> {
@@ -77,13 +78,14 @@ export async function saveExercise(raw: unknown): Promise<ActionResult> {
     const { error } = await ctx.supabase.from("lift_exercises").update(row).eq("id", id);
     return error ? fail(error) : { ok: true, id };
   }
-  const { data: last } = await ctx.supabase.from("lift_exercises").select("position").eq("day", row.day).order("position", { ascending: false }).limit(1);
+  const { data: last } = await ctx.supabase.from("lift_exercises").select("position").order("position", { ascending: false }).limit(1);
   const { data, error } = await ctx.supabase.from("lift_exercises").insert({ ...row, user_id: ctx.userId, position: (last?.[0]?.position ?? -1) + 1 }).select("id").single();
   if (error) return fail(error);
   revalidatePath("/split");
   return { ok: true, id: data.id };
 }
 
+/** Removes it from the list and every day. Past workouts keep their sets. */
 export async function deleteExercise(id: string): Promise<ActionResult> {
   if (!uuid.safeParse(id).success) return { ok: false, error: "Unknown exercise." };
   const ctx = await getContext();
@@ -92,9 +94,46 @@ export async function deleteExercise(id: string): Promise<ActionResult> {
   return fail(error);
 }
 
-/** Saves a new order for one table (exercises within a day, checklist items, notes). */
-export async function reorder(table: "lift_exercises" | "lift_checklist_items" | "lift_notes", ids: string[]): Promise<ActionResult> {
-  if (!["lift_exercises", "lift_checklist_items", "lift_notes"].includes(table)) return { ok: false, error: "Unknown list." };
+// ---------- workout days ----------
+
+export async function saveDay(raw: unknown): Promise<ActionResult> {
+  const p = z.object({ id: uuid.optional(), name: z.string().trim().min(1, "Name the day.").max(60) }).safeParse(raw);
+  if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Check the day." };
+  const ctx = await getContext();
+  const { id, name } = p.data;
+  if (id) return fail((await ctx.supabase.from("lift_days").update({ name }).eq("id", id)).error);
+  const { data: last } = await ctx.supabase.from("lift_days").select("position").order("position", { ascending: false }).limit(1);
+  const { data, error } = await ctx.supabase.from("lift_days").insert({ name, user_id: ctx.userId, position: (last?.[0]?.position ?? -1) + 1 }).select("id").single();
+  if (error) return fail(error);
+  revalidatePath("/split");
+  return { ok: true, id: data.id };
+}
+
+export async function deleteDay(id: string): Promise<ActionResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, error: "Unknown day." };
+  const ctx = await getContext();
+  const { error } = await ctx.supabase.from("lift_days").delete().eq("id", id);
+  revalidatePath("/split");
+  return fail(error);
+}
+
+/** Sets a day's exercises (in order) in one go. */
+export async function setDayExercises(dayId: string, exerciseIds: string[]): Promise<ActionResult> {
+  if (!uuid.safeParse(dayId).success || !z.array(uuid).max(60).safeParse(exerciseIds).success) return { ok: false, error: "Unknown exercises." };
+  const ctx = await getContext();
+  const { error } = await ctx.supabase.from("lift_day_exercises").delete().eq("day_id", dayId);
+  if (error) return fail(error);
+  if (exerciseIds.length) {
+    const { error: e2 } = await ctx.supabase.from("lift_day_exercises").insert(exerciseIds.map((exercise_id, position) => ({ user_id: ctx.userId, day_id: dayId, exercise_id, position })));
+    if (e2) return fail(e2);
+  }
+  revalidatePath("/split");
+  return { ok: true };
+}
+
+/** Saves a new order for one list. */
+export async function reorder(table: "lift_exercises" | "lift_days" | "lift_checklist_items" | "lift_notes", ids: string[]): Promise<ActionResult> {
+  if (!["lift_exercises", "lift_days", "lift_checklist_items", "lift_notes"].includes(table)) return { ok: false, error: "Unknown list." };
   if (!z.array(uuid).max(200).safeParse(ids).success) return { ok: false, error: "Unknown items." };
   const ctx = await getContext();
   for (let i = 0; i < ids.length; i++) {
@@ -142,16 +181,18 @@ export async function deleteNote(id: string): Promise<ActionResult> {
 
 // ---------- workouts ----------
 
-/** Starts Upper or Lower from the split at the current weights, or reopens the one already going. */
-export async function startWorkout(d: "upper" | "lower"): Promise<ActionResult> {
-  if (!day.safeParse(d).success) return { ok: false, error: "Pick Upper or Lower." };
+/** Starts a day from the split at the current weights, or reopens the workout already going. */
+export async function startWorkout(dayId: string): Promise<ActionResult> {
+  if (!uuid.safeParse(dayId).success) return { ok: false, error: "Pick a day." };
   const ctx = await getContext();
   const { data: open } = await ctx.supabase.from("lift_sessions").select("id").eq("status", "active").maybeSingle();
   if (open) return { ok: true, id: open.id };
+  const day = (await getDays(ctx)).find((d) => d.id === dayId);
+  if (!day) return { ok: false, error: "That day isn't in your split anymore." };
   const id = randomUUID();
-  const { error } = await ctx.supabase.from("lift_sessions").insert({ id, user_id: ctx.userId, date: todayIn(ctx.settings.timezone), day: d, status: "active" });
+  const { error } = await ctx.supabase.from("lift_sessions").insert({ id, user_id: ctx.userId, date: todayIn(ctx.settings.timezone), day_id: day.id, day_name: day.name, status: "active" });
   if (error) return fail(error);
-  const sets = setsFromSplit(await getExercises(ctx), d, id, randomUUID);
+  const sets = setsFromDay(day, await getExercises(ctx), id, randomUUID);
   if (sets.length) {
     const { error: e2 } = await ctx.supabase.from("lift_sets").insert(sets.map((s) => ({ ...s, user_id: ctx.userId })));
     if (e2) return fail(e2);
@@ -160,10 +201,22 @@ export async function startWorkout(d: "upper" | "lower"): Promise<ActionResult> 
   return { ok: true, id };
 }
 
+/** Logs today as a rest day. The rotation doesn't move. */
+export async function logRestDay(): Promise<ActionResult> {
+  const ctx = await getContext();
+  const date = todayIn(ctx.settings.timezone);
+  const { data: already } = await ctx.supabase.from("lift_sessions").select("id").eq("date", date).eq("rest", true).maybeSingle();
+  if (already) return { ok: true, id: already.id };
+  const now = new Date().toISOString();
+  const { data, error } = await ctx.supabase.from("lift_sessions").insert({ user_id: ctx.userId, date, day_name: "Rest", rest: true, status: "done", finished_at: now }).select("id").single();
+  revalidatePath("/", "layout");
+  return error ? fail(error) : { ok: true, id: data.id };
+}
+
 const setSchema = z.object({
   id: uuid,
   exercise_id: uuid.nullable(),
-  name: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(120),
   target_reps: z.string().max(20),
   position: z.number().int().min(0).max(500),
   set_no: z.number().int().min(1).max(50),
