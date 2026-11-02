@@ -49,8 +49,8 @@ describe("numbers", () => {
     expect(e1rm(135, 20)).toBeNull();
     expect(e1rm(null, 5)).toBeNull();
   });
-  it("counts volume from finished sets only", () => {
-    expect(volume([set({ weight_lb: 100, reps: 10 }), set({ weight_lb: 100, reps: 10, done: false })])).toBe(1000);
+  it("counts volume from every set with reps, ticked or not", () => {
+    expect(volume([set({ weight_lb: 100, reps: 10 }), set({ weight_lb: 100, reps: 10, done: false }), set({ weight_lb: 100, reps: null, done: false })])).toBe(2000);
   });
   it("converts lbs and kg both ways", () => {
     expect(toUnit(220.462, "kg")).toBe(100);
@@ -92,5 +92,14 @@ describe("summary", () => {
     expect(s.weekStreak).toBe(2);
     expect(s.thisWeek).toBe(1);
     expect(s.daysSinceLast).toBe(6);
+  });
+});
+
+import { isDone } from "@/lib/lift";
+describe("reps count as done", () => {
+  it("counts a set with reps even if it was never ticked", () => {
+    expect(isDone({ done: false, reps: 6 })).toBe(true);
+    expect(isDone({ done: false, reps: null })).toBe(false);
+    expect(isDone({ done: true, reps: null })).toBe(true);
   });
 });

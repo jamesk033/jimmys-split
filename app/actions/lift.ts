@@ -338,7 +338,7 @@ export async function saveWorkout(raw: unknown): Promise<ActionResult> {
   const { error: delErr } = await del;
   if (delErr) return fail(delErr);
   if (w.sets.length) {
-    const { error: upErr } = await ctx.supabase.from("lift_sets").upsert(w.sets.map((s) => ({ ...s, session_id: w.id, user_id: ctx.userId })), { onConflict: "id" });
+    const { error: upErr } = await ctx.supabase.from("lift_sets").upsert(w.sets.map((s) => ({ ...s, done: s.done || (s.reps ?? 0) > 0, session_id: w.id, user_id: ctx.userId })), { onConflict: "id" });
     if (upErr) return fail(upErr);
   }
   for (const [exId, weight] of Object.entries(w.next)) {

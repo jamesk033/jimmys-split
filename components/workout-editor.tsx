@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { deleteWorkout, finishWorkout, saveExercise, saveWorkout } from "@/app/actions/lift";
-import { groupSets, setsDone, shouldGoUp, volume, type Best } from "@/lib/lift";
+import { groupSets, isDone, setsDone, shouldGoUp, volume, type Best } from "@/lib/lift";
 import { longDate } from "@/lib/time";
 import { type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight, fromUnit, stepFor, toUnit } from "@/lib/units";
@@ -193,7 +193,7 @@ export function WorkoutEditor({
       return all.map((s) => {
         if (s.id === id) return { ...s, ...patch };
         // A new weight carries down to the later, unchecked sets of the same exercise that had the old weight.
-        if ("weight_lb" in patch && s.position === target.position && s.name === target.name && s.set_no > target.set_no && !s.done && s.weight_lb === target.weight_lb) return { ...s, weight_lb: patch.weight_lb ?? null };
+        if ("weight_lb" in patch && s.position === target.position && s.name === target.name && s.set_no > target.set_no && !isDone(s) && s.weight_lb === target.weight_lb) return { ...s, weight_lb: patch.weight_lb ?? null };
         return s;
       });
     });
@@ -304,8 +304,8 @@ export function WorkoutEditor({
           {!groups.length && <Empty title="No exercises in this workout">Add one below, or set up your split first.</Empty>}
           {groups.map((g) => {
             const ex = g.exerciseId ? splitById.get(g.exerciseId) : undefined;
-            const all = g.sets.every((s) => s.done);
-            const hit = g.sets.find((s) => s.done && shouldGoUp(g.target, s.reps));
+            const all = g.sets.every(isDone);
+            const hit = g.sets.find((s) => isDone(s) && shouldGoUp(g.target, s.reps));
             return (
               <Card key={g.key} className={cx(all && "border-win/40")}>
                 <div className="mb-3 flex items-start justify-between gap-3">
@@ -360,25 +360,29 @@ export function WorkoutEditor({
                   <span />
                 </div>
                 <ul className="grid gap-2">
-                  {g.sets.map((s) => (
+                  {g.sets.map((s) => {
+                    const done = isDone(s);
+                    return (
                     <li key={s.id} className="grid grid-cols-[2.75rem_1fr_1fr_2.25rem] items-center gap-2">
                       <button
                         type="button"
                         role="checkbox"
-                        aria-checked={s.done}
+                        aria-checked={done}
                         aria-label={`Set ${s.set_no} done`}
-                        onClick={() => patchSet(s.id, { done: !s.done })}
-                        className={cx("grid h-11 w-11 place-items-center rounded-xl border text-[15px] font-semibold tabular-nums", s.done ? "border-win bg-win text-black" : "border-line bg-bg text-muted hover:border-accent")}
+                        // Typing reps already saves the set as done; the tick is only for a set without a rep count.
+                        onClick={() => (s.reps ?? 0) > 0 ? undefined : patchSet(s.id, { done: !s.done })}
+                        className={cx("grid h-11 w-11 place-items-center rounded-xl border text-[15px] font-semibold tabular-nums", done ? "border-win bg-win text-black" : "border-line bg-bg text-muted hover:border-accent")}
                       >
-                        {s.done ? <IconCheck /> : s.set_no}
+                        {done ? <IconCheck /> : s.set_no}
                       </button>
-                      <NumField label={`Set ${s.set_no} weight in ${units}`} value={toUnit(s.weight_lb, units)} onChange={(v) => patchSet(s.id, { weight_lb: fromUnit(v, units) })} placeholder="0" className={cx(s.done && "border-win/30")} />
-                      <NumField label={`Set ${s.set_no} reps`} decimals={false} value={s.reps} onChange={(v) => patchSet(s.id, { reps: v, done: v !== null && v > 0 ? true : s.done })} placeholder={g.target || "0"} className={cx(s.done && "border-win/30")} />
+                      <NumField label={`Set ${s.set_no} weight in ${units}`} value={toUnit(s.weight_lb, units)} onChange={(v) => patchSet(s.id, { weight_lb: fromUnit(v, units) })} placeholder="0" className={cx(done && "border-win/30")} />
+                      <NumField label={`Set ${s.set_no} reps`} decimals={false} value={s.reps} onChange={(v) => patchSet(s.id, { reps: v, done: v !== null && v > 0 ? true : v === null ? false : s.done })} placeholder={g.target || "0"} className={cx(done && "border-win/30")} />
                       <button type="button" onClick={() => removeSet(s.id)} aria-label={`Remove set ${s.set_no}`} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-loss">
                         <IconX width={18} height={18} />
                       </button>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
 
                 {hit && (

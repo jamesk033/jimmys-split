@@ -31,7 +31,7 @@ Lifting log (PWA) built by ICT_Jimmy (GitHub jamesk033). Sister site of Jimmy's 
 - Owner's own split, weights, checklists and notes are loaded by `0002_owner_split.sql`.
 - After sign-up: username, then lbs/kg, then choose (layout gate, `lift_settings.setup`): "Use Jimmy's split" copies the admin's (first `app_admins` row) days, exercise list, checklists and key notes via `lift_template()`, never weights; "Build my own" starts empty. Settings has "Start over" to switch (type RESET; workouts stay).
 - Paste-in import on the Split page (lib/import.ts): day name line, then "Muscle - Exercise - Equipment | weight | reps" lines, blank line between days. Reuses exercises with the same name.
-- Typing reps on a set marks it done. Each exercise in a workout has Edit: change details (saves to exercise list), swap to the alternative for today, or remove from this workout.
+- A set with reps counts as done (`isDone`), ticked or not; the tick only matters for a set with no reps. Each exercise in a workout has Edit: change details (saves to exercise list), swap to the alternative for today, or remove from this workout.
 
 ## Ideas not built yet (only if asked)
 - AI coach chat (Gemini), share image of a workout, push reminders, guest mode, rest timer, plate calculator, bodyweight chart.

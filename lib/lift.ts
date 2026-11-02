@@ -47,14 +47,17 @@ export function e1rm(weightLb: number | null, reps: number | null): number | nul
   return reps === 1 ? weightLb : weightLb * (1 + reps / 30);
 }
 
-const counted = (s: SetRow) => s.done && s.weight_lb !== null && s.reps !== null && s.reps > 0;
+/** A set is done once it has reps, or when it's ticked by hand (e.g. a set with no rep count). */
+export const isDone = (s: Pick<SetRow, "done" | "reps">) => s.done || (s.reps ?? 0) > 0;
+
+const counted = (s: SetRow) => isDone(s) && s.weight_lb !== null && s.reps !== null && s.reps > 0;
 
 /** Pounds moved: weight x reps over finished sets. */
 export function volume(sets: SetRow[]): number {
   return sets.filter(counted).reduce((t, s) => t + (s.weight_lb ?? 0) * (s.reps ?? 0), 0);
 }
 
-export const setsDone = (sets: SetRow[]) => sets.filter((s) => s.done).length;
+export const setsDone = (sets: SetRow[]) => sets.filter(isDone).length;
 
 export interface Best {
   name: string;

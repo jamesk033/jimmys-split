@@ -120,7 +120,8 @@ export function normalizeSet(r: Record<string, unknown>): SetRow {
     set_no: Number(r.set_no ?? 1),
     weight_lb: num(r.weight_lb),
     reps: num(r.reps),
-    done: Boolean(r.done),
+    // Reps typed = done, even if the tick never got saved.
+    done: Boolean(r.done) || (num(r.reps) ?? 0) > 0,
   };
 }
 
