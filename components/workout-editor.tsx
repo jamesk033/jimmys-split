@@ -364,19 +364,12 @@ export function WorkoutEditor({
                     const done = isDone(s);
                     return (
                     <li key={s.id} className="grid grid-cols-[2.75rem_1fr_1fr_2.25rem] items-center gap-2">
-                      <button
-                        type="button"
-                        role="checkbox"
-                        aria-checked={done}
-                        aria-label={`Set ${s.set_no} done`}
-                        // Typing reps already saves the set as done; the tick is only for a set without a rep count.
-                        onClick={() => (s.reps ?? 0) > 0 ? undefined : patchSet(s.id, { done: !s.done })}
-                        className={cx("grid h-11 w-11 place-items-center rounded-xl border text-[15px] font-semibold tabular-nums", done ? "border-win bg-win text-black" : "border-line bg-bg text-muted hover:border-accent")}
-                      >
-                        {done ? <IconCheck /> : s.set_no}
-                      </button>
+                      {/* Set number, not a checkbox: typing reps is what logs the set. */}
+                      <span className={cx("grid h-11 w-11 place-items-center rounded-xl text-[15px] font-semibold tabular-nums", done ? "text-win" : "text-muted")} aria-label={`Set ${s.set_no}${done ? ", logged" : ""}`}>
+                        {s.set_no}
+                      </span>
                       <NumField label={`Set ${s.set_no} weight in ${units}`} value={toUnit(s.weight_lb, units)} onChange={(v) => patchSet(s.id, { weight_lb: fromUnit(v, units) })} placeholder="0" className={cx(done && "border-win/30")} />
-                      <NumField label={`Set ${s.set_no} reps`} decimals={false} value={s.reps} onChange={(v) => patchSet(s.id, { reps: v, done: v !== null && v > 0 ? true : v === null ? false : s.done })} placeholder={g.target || "0"} className={cx(done && "border-win/30")} />
+                      <NumField label={`Set ${s.set_no} reps`} decimals={false} value={s.reps} onChange={(v) => patchSet(s.id, { reps: v, done: v !== null && v > 0 })} placeholder={g.target || "0"} className={cx(done && "border-win/30")} />
                       <button type="button" onClick={() => removeSet(s.id)} aria-label={`Remove set ${s.set_no}`} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-loss">
                         <IconX width={18} height={18} />
                       </button>

@@ -98,8 +98,8 @@ describe("summary", () => {
 import { isDone } from "@/lib/lift";
 describe("reps count as done", () => {
   it("counts a set with reps even if it was never ticked", () => {
-    expect(isDone({ done: false, reps: 6 })).toBe(true);
-    expect(isDone({ done: false, reps: null })).toBe(false);
-    expect(isDone({ done: true, reps: null })).toBe(true);
+    expect(isDone({ reps: 6 })).toBe(true);
+    expect(isDone({ reps: null })).toBe(false);
+    expect(isDone({ reps: 0 })).toBe(false);
   });
 });

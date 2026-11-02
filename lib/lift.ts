@@ -47,8 +47,8 @@ export function e1rm(weightLb: number | null, reps: number | null): number | nul
   return reps === 1 ? weightLb : weightLb * (1 + reps / 30);
 }
 
-/** A set is done once it has reps, or when it's ticked by hand (e.g. a set with no rep count). */
-export const isDone = (s: Pick<SetRow, "done" | "reps">) => s.done || (s.reps ?? 0) > 0;
+/** A set is done once it has reps. There's no tick box: typing reps logs the set. */
+export const isDone = (s: Pick<SetRow, "reps">) => (s.reps ?? 0) > 0;
 
 const counted = (s: SetRow) => isDone(s) && s.weight_lb !== null && s.reps !== null && s.reps > 0;
 
