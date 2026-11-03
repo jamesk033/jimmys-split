@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { groupSets, setsDone, volume } from "@/lib/lift";
-import { longDate, minutesBetween } from "@/lib/time";
+import { longDate } from "@/lib/time";
 import { isLower, type SessionWithSets, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight } from "@/lib/units";
 import { Badge, Card, Empty } from "./ui";
@@ -11,7 +11,6 @@ export function HistoryList({ sessions, units }: { sessions: SessionWithSets[]; 
   return (
     <ul className="grid gap-3">
       {sessions.map((s) => {
-        const mins = minutesBetween(s.started_at, s.finished_at);
         if (s.rest)
           return (
             <li key={s.id} className="flex items-center gap-2 rounded-2xl border border-dashed border-line px-4 py-3 text-[14px] text-muted">
@@ -31,7 +30,6 @@ export function HistoryList({ sessions, units }: { sessions: SessionWithSets[]; 
                   </div>
                   <span className="text-[13px] text-muted">
                     {setsDone(s.sets)}/{s.sets.length} sets · {fmtBig(volume(s.sets), units)}
-                    {mins !== null && mins < 600 ? ` · ${mins} min` : ""}
                   </span>
                 </div>
                 <ul className="grid gap-0.5 text-[14px]">
