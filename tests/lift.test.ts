@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allTimeBests, e1rm, firstReps, nextDay, prsIn, progressFor, setsFromDay, shouldGoUp, summarize, volume } from "@/lib/lift";
+import { allTimeBests, e1rm, firstReps, nextDay, prsIn, progressFor, setsFromDay, shouldGoUp, summarize, unloggedDays, volume } from "@/lib/lift";
 import { fmtWeight, fromUnit, toUnit } from "@/lib/units";
 import { shortDay, type SessionWithSets, type SetRow, type WorkoutDay } from "@/lib/types";
 
@@ -101,5 +101,15 @@ describe("reps count as done", () => {
     expect(isDone({ reps: 6 })).toBe(true);
     expect(isDone({ reps: null })).toBe(false);
     expect(isDone({ reps: 0 })).toBe(false);
+  });
+});
+
+describe("auto rest days", () => {
+  it("fills days with nothing logged up to yesterday", () => {
+    expect(unloggedDays(["2026-11-01", "2026-11-03"], "2026-11-05")).toEqual(["2026-11-02", "2026-11-04"]);
+  });
+  it("never marks today, and does nothing before the first log", () => {
+    expect(unloggedDays(["2026-11-04"], "2026-11-05")).toEqual([]);
+    expect(unloggedDays([], "2026-11-05")).toEqual([]);
   });
 });

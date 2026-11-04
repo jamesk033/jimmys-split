@@ -88,6 +88,12 @@ describe("lift schema", () => {
     expect((await as(B, `select * from lift_exercises where name = 'RDL'`)).rows).toHaveLength(0);
   });
 
+  it("allows one rest day per date", async () => {
+    await db.exec(readFileSync(path.join(__dirname, "../supabase/migrations/0004_auto_rest.sql"), "utf8"));
+    await as(B, `insert into lift_sessions (date, day_name, rest, status) values ('2026-11-02', 'Rest', true, 'done')`);
+    await expect(as(B, `insert into lift_sessions (date, day_name, rest, status) values ('2026-11-02', 'Rest', true, 'done')`)).rejects.toThrow();
+  });
+
   it("rejects units other than lb or kg", async () => {
     await as(B, `insert into lift_settings (units) values ('kg')`);
     await expect(as(B, `update lift_settings set units = 'stone'`)).rejects.toThrow();

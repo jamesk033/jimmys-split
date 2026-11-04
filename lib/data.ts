@@ -4,7 +4,8 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { DEFAULT_CHECKLIST, DEFAULT_DAYS, DEFAULT_EXERCISES, DEFAULT_NOTES } from "./defaults";
 import { createClient, type ServerSupabase } from "./supabase/server";
-import { DEFAULT_TZ } from "./time";
+import { unloggedDays } from "./lift";
+import { DEFAULT_TZ, addDays, todayIn } from "./time";
 import { normalizeExercise, normalizeSession, normalizeSet, type ChecklistItem, type Exercise, type LiftSettings, type Note, type SessionWithSets, type WorkoutDay } from "./types";
 
 export interface AppContext {
@@ -49,6 +50,19 @@ export async function seedFromTemplate(supabase: ServerSupabase, userId: string)
   await supabase.from("lift_notes").insert(notes.map((n) => ({ user_id: userId, title: n.title, body: n.body ?? "", position: n.position })));
 }
 
+/** Any day that hit midnight with nothing logged becomes a rest day. Runs on page load, so no timer is needed. */
+async function backfillRestDays(supabase: ServerSupabase, userId: string, tz: string) {
+  const today = todayIn(tz);
+  const { data: first } = await supabase.from("lift_sessions").select("date").order("date").limit(1);
+  if (!first?.length) return;
+  const from = String(first[0].date) > addDays(today, -91) ? String(first[0].date) : addDays(today, -91);
+  const { data } = await supabase.from("lift_sessions").select("date").gte("date", from).lt("date", today);
+  const missing = unloggedDays([String(first[0].date), ...(data ?? []).map((r) => String(r.date))], today);
+  if (!missing.length) return;
+  // The unique index on rest days (when present) stops two tabs from doubling up.
+  await supabase.from("lift_sessions").insert(missing.map((date) => ({ user_id: userId, date, day_name: "Rest", rest: true, status: "done", started_at: `${date}T12:00:00Z`, finished_at: `${date}T12:00:00Z` })));
+}
+
 /** Signed-in user, username and lifting settings. Cached per request. */
 export const getContext = cache(async (): Promise<AppContext> => {
   const supabase = await createClient();
@@ -71,6 +85,7 @@ export const getContext = cache(async (): Promise<AppContext> => {
     await supabase.from("lift_settings").insert({ user_id: user.id });
     ({ data: row } = await supabase.from("lift_settings").select("*").eq("user_id", user.id).maybeSingle());
   }
+  if (row?.setup) await backfillRestDays(supabase, user.id, (row.timezone as string) || DEFAULT_TZ);
   return {
     supabase,
     userId: user.id,

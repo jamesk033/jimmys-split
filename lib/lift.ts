@@ -187,3 +187,16 @@ export function groupSets(sets: SetRow[]): { key: string; name: string; exercise
   }
   return [...groups.values()];
 }
+
+/**
+ * Days that ended with nothing logged, from the first day you ever logged through yesterday,
+ * capped to the last 90 days. Each one gets saved as a rest day.
+ */
+export function unloggedDays(loggedDates: string[], today: string, maxBack = 90): string[] {
+  if (!loggedDates.length) return [];
+  const have = new Set(loggedDates);
+  const first = [...loggedDates].sort()[0];
+  const out: string[] = [];
+  for (let d = addDays(today, -1), n = 0; d >= first && n < maxBack; d = addDays(d, -1), n++) if (!have.has(d)) out.push(d);
+  return out.reverse();
+}
