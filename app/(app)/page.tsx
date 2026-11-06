@@ -1,4 +1,3 @@
-import { DailyVerse } from "@/components/daily-verse";
 import { DashboardView } from "@/components/dashboard-view";
 import { getContext, getDays, getSessions } from "@/lib/data";
 import { allTimeBests, loggedNames, nextDay, progressFor, summarize } from "@/lib/lift";
@@ -14,7 +13,6 @@ export default async function HomePage() {
   return (
     <DashboardView
       name={ctx.username ? `@${ctx.username}` : "Lifter"}
-      verse={<DailyVerse />}
       summary={summarize(sessions, today)}
       next={next?.name ?? null}
       nextCount={next?.exerciseIds.length ?? 0}

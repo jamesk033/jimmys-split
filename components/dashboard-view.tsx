@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import type { Best, Summary } from "@/lib/lift";
 import { setsDone, volume } from "@/lib/lift";
 import { shortDate } from "@/lib/time";
@@ -11,7 +10,6 @@ import { Badge, Card, Empty, PageHeader, Stat, StatGrid, cx } from "./ui";
 
 export function DashboardView({
   name,
-  verse,
   summary,
   next,
   nextCount,
@@ -22,7 +20,6 @@ export function DashboardView({
   units,
 }: {
   name: string;
-  verse?: ReactNode;
   summary: Summary;
   next: string | null;
   nextCount: number;
@@ -35,10 +32,7 @@ export function DashboardView({
   const since = summary.daysSinceLast;
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeader eyebrow="Welcome back" title={name} />
-        {verse}
-      </div>
+      <PageHeader eyebrow="Welcome back" title={name} />
 
       <Link
         href="/workout"
