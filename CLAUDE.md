@@ -33,5 +33,7 @@ Lifting log (PWA) built by ICT_Jimmy (GitHub jamesk033). Sister site of Jimmy's 
 - Paste-in import on the Split page (lib/import.ts): day name line, then "Muscle - Exercise - Equipment | weight | reps" lines, blank line between days. Reuses exercises with the same name.
 - No tick boxes on sets: a set with reps is done (`isDone`). The set number turns green once reps are in. Each exercise in a workout has Edit: change details (saves to exercise list), swap to the alternative for today, or remove from this workout.
 
+- Daily Bible verse on Home (lib/verse.ts): 90 fixed KJV verses, New York date, index = floor(Date.UTC(y,m-1,d)/86400000) % 90, rechecks every 60s. Must match Jimmy's Journal and the TradingView indicator; never edit the list.
+
 ## Ideas not built yet (only if asked)
 - AI coach chat (Gemini), share image of a workout, push reminders, guest mode, rest timer, plate calculator, bodyweight chart.

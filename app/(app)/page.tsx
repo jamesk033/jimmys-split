@@ -14,7 +14,7 @@ export default async function HomePage() {
   return (
     <DashboardView
       name={ctx.username ? `@${ctx.username}` : "Lifter"}
-      verse={<DailyVerse date={today} />}
+      verse={<DailyVerse />}
       summary={summarize(sessions, today)}
       next={next?.name ?? null}
       nextCount={next?.exerciseIds.length ?? 0}
