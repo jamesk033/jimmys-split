@@ -34,4 +34,4 @@ Lifting log (PWA) built by ICT_Jimmy (GitHub jamesk033). Sister site of Jimmy's 
 - No tick boxes on sets: a set with reps is done (`isDone`). The set number turns green once reps are in. Each exercise in a workout has Edit: change details (saves to exercise list), swap to the alternative for today, or remove from this workout.
 
 ## Ideas not built yet (only if asked)
-- AI coach chat (Gemini), share image of a workout, push reminders, guest mode, rest timer, plate calculator, bodyweight chart.
+- Share image of a workout, push reminders, guest mode, rest timer, plate calculator, bodyweight chart.
