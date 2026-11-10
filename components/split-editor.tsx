@@ -130,9 +130,9 @@ function DayCard({ day, index, total, exercises, units, onMove, onDeleted, previ
                         <IconChevronDown className={cx("shrink-0 text-muted transition", editing === i && "rotate-180")} />
                       </button>
                       <Arrows label={e.name} first={i === 0} last={i === ids.length - 1} onMove={(d) => { setEditing(null); swap(i, d); }} />
-                      <button type="button" aria-label={`Remove ${e.name} from ${day.name}`} onClick={() => { setEditing(null); commit(ids.filter((_, j) => j !== i)); }} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-loss">
+                      <ConfirmDelete label={`Remove ${e.name} from ${day.name}`} confirmText="Remove?" className="min-h-11 min-w-9" onConfirm={() => { setEditing(null); commit(ids.filter((_, j) => j !== i)); }}>
                         <IconX width={18} height={18} />
-                      </button>
+                      </ConfirmDelete>
                     </div>
                     {editing === i && (
                       <div className="border-t border-line p-3">

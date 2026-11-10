@@ -353,7 +353,7 @@ export function WorkoutEditor({
                   />
                 )}
 
-                <div className="grid grid-cols-[2.75rem_1fr_1fr_2.25rem] items-center gap-2 px-0.5 pb-1 text-[11px] uppercase tracking-wide text-muted">
+                <div className="grid grid-cols-[2.75rem_1fr_1fr_2.75rem] items-center gap-2 px-0.5 pb-1 text-[11px] uppercase tracking-wide text-muted">
                   <span>Set</span>
                   <span className="text-center">{units}</span>
                   <span className="text-center">Reps</span>
@@ -363,16 +363,16 @@ export function WorkoutEditor({
                   {g.sets.map((s) => {
                     const done = isDone(s);
                     return (
-                    <li key={s.id} className="grid grid-cols-[2.75rem_1fr_1fr_2.25rem] items-center gap-2">
+                    <li key={s.id} className="grid grid-cols-[2.75rem_1fr_1fr_2.75rem] items-center gap-2">
                       {/* Set number, not a checkbox: typing reps is what logs the set. */}
                       <span className={cx("grid h-11 w-11 place-items-center rounded-xl text-[15px] font-semibold tabular-nums", done ? "text-win" : "text-muted")} aria-label={`Set ${s.set_no}${done ? ", logged" : ""}`}>
                         {s.set_no}
                       </span>
                       <NumField label={`Set ${s.set_no} weight in ${units}`} value={toUnit(s.weight_lb, units)} onChange={(v) => patchSet(s.id, { weight_lb: fromUnit(v, units) })} placeholder="0" className={cx(done && "border-win/30")} />
                       <NumField label={`Set ${s.set_no} reps`} decimals={false} value={s.reps} onChange={(v) => patchSet(s.id, { reps: v, done: v !== null && v > 0 })} placeholder={g.target || "0"} className={cx(done && "border-win/30")} />
-                      <button type="button" onClick={() => removeSet(s.id)} aria-label={`Remove set ${s.set_no}`} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-loss">
+                      <ConfirmDelete label={`Remove set ${s.set_no}`} confirmText="Sure?" className="min-h-11 w-full px-0 text-[11px]" onConfirm={() => removeSet(s.id)}>
                         <IconX width={18} height={18} />
-                      </button>
+                      </ConfirmDelete>
                     </li>
                     );
                   })}
