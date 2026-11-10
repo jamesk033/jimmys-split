@@ -275,15 +275,45 @@ export async function deleteDay(id: string): Promise<ActionResult> {
 export async function setDayExercises(dayId: string, exerciseIds: string[]): Promise<ActionResult> {
   if (!uuid.safeParse(dayId).success || !z.array(uuid).max(60).safeParse(exerciseIds).success) return { ok: false, error: "Unknown exercises." };
   const ctx = await getContext();
-  const { error } = await ctx.supabase.from("lift_day_exercises").delete().eq("day_id", dayId);
-  if (error) return fail(error);
-  if (exerciseIds.length) {
-    const { error: e2 } = await ctx.supabase.from("lift_day_exercises").insert(exerciseIds.map((exercise_id, position) => ({ user_id: ctx.userId, day_id: dayId, exercise_id, position })));
+  // Only exercises that still exist; anything else is skipped instead of failing the whole day.
+  const { data: real } = exerciseIds.length ? await ctx.supabase.from("lift_exercises").select("id").in("id", exerciseIds) : { data: [] };
+  const ok = new Set((real ?? []).map((r) => String(r.id)));
+  const keep = exerciseIds.filter((id) => ok.has(id));
+  // Add the new rows first and only then remove the old ones, so a failed save never empties the day.
+  const { data: old, error: readErr } = await ctx.supabase.from("lift_day_exercises").select("id").eq("day_id", dayId);
+  if (readErr) return fail(readErr);
+  if (keep.length) {
+    const { error: e2 } = await ctx.supabase.from("lift_day_exercises").insert(keep.map((exercise_id, position) => ({ user_id: ctx.userId, day_id: dayId, exercise_id, position })));
     if (e2) return fail(e2);
+  }
+  const oldIds = (old ?? []).map((r) => String(r.id));
+  if (oldIds.length) {
+    const { error } = await ctx.supabase.from("lift_day_exercises").delete().in("id", oldIds);
+    if (error) return fail(error);
   }
   await pruneUnused(ctx);
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Adds an exercise to the end of a day: an existing one by name, or a new one. Done in one step on the server. */
+export async function addToDay(dayId: string, rawName: string): Promise<ActionResult> {
+  const name = rawName.trim().slice(0, 120);
+  if (!uuid.safeParse(dayId).success || !name) return { ok: false, error: "Type an exercise name." };
+  const ctx = await getContext();
+  const { data: found } = await ctx.supabase.from("lift_exercises").select("id").ilike("name", name.replace(/[%_\\]/g, "\\$&")).limit(1);
+  let id = found?.[0]?.id ? String(found[0].id) : null;
+  if (!id) {
+    id = randomUUID();
+    const { data: last } = await ctx.supabase.from("lift_exercises").select("position").order("position", { ascending: false }).limit(1);
+    const { error } = await ctx.supabase.from("lift_exercises").insert({ id, user_id: ctx.userId, muscle: "", name: name[0].toUpperCase() + name.slice(1), equipment: "", sets: 1, reps: "4-8", position: (last?.[0]?.position ?? -1) + 1 });
+    if (error) return fail(error);
+  }
+  const { data: lastItem } = await ctx.supabase.from("lift_day_exercises").select("position").eq("day_id", dayId).order("position", { ascending: false }).limit(1);
+  const { error } = await ctx.supabase.from("lift_day_exercises").insert({ user_id: ctx.userId, day_id: dayId, exercise_id: id, position: (lastItem?.[0]?.position ?? -1) + 1 });
+  if (error) return fail(error);
+  revalidatePath("/", "layout");
+  return { ok: true, id };
 }
 
 /** Saves a new order for one list. */

@@ -5,7 +5,7 @@ import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, 
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { deleteDay, deleteExercise, importSplit, reorder, replaceSplit, saveDay, saveExercise, setDayExercises } from "@/app/actions/lift";
+import { addToDay, deleteDay, deleteExercise, importSplit, reorder, replaceSplit, saveDay, saveExercise, setDayExercises } from "@/app/actions/lift";
 import { parseSplit, splitToText } from "@/lib/import";
 import type { Exercise, Units, WorkoutDay } from "@/lib/types";
 import { exerciseLabel } from "@/lib/types";
@@ -114,14 +114,13 @@ function DayCard({ day, index, grip, exercises, units, onDeleted, preview }: { d
     }
     start(async () => {
       setErr("");
-      const res = await saveExercise({ muscle: "", name: n, equipment: "", sets: 1, reps: "4-8", weight_lb: null, note: "", alternative: "" });
+      // One server step: make the exercise and put it on this day together.
+      const res = await addToDay(day.id, n);
       if (!res.ok || !res.id) return setErr(res.ok ? "Couldn't add it." : res.error);
       const next = [...ids, res.id];
       setIds(next);
       setEditing(`${res.id}-${next.length - 1}`);
       setPick("");
-      const r2 = await setDayExercises(day.id, next);
-      if (!r2.ok) return setErr(r2.error);
       router.refresh();
     });
   };
