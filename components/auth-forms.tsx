@@ -52,6 +52,12 @@ export function LoginForm({ next, linkError }: { next: string; linkError?: boole
           Create a free account
         </Link>
       </p>
+      <p className="mt-2 text-center text-[14px]">
+        {/* Plain link, not <Link>: /guest is a route that sets a cookie, so it must be a full page load. */}
+        <a href="/guest" className="text-muted underline underline-offset-2 hover:text-ink">
+          Look around without an account
+        </a>
+      </p>
     </>
   );
 }

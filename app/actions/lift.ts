@@ -24,6 +24,15 @@ export async function setUnits(units: "lb" | "kg"): Promise<ActionResult> {
   return fail(error);
 }
 
+/** Your order for the workout tabs. */
+export async function saveTabOrder(order: string[]): Promise<ActionResult> {
+  const ok = ["pre", "workout", "post", "refuel"];
+  if (!Array.isArray(order) || order.length !== 4 || !order.every((k) => ok.includes(k)) || new Set(order).size !== 4) return { ok: false, error: "Unknown tabs." };
+  const ctx = await getContext();
+  const { error } = await ctx.supabase.from("lift_settings").update({ tab_order: order }).eq("user_id", ctx.userId);
+  return fail(error);
+}
+
 export async function setTimezone(tz: string): Promise<ActionResult> {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: tz });

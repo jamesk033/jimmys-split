@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { setLiftWebhook } from "@/app/actions/share";
 import { chooseSplit, resetWorkouts, setTimezone, setUnits, setUsername, startOver } from "@/app/actions/lift";
 import type { Units } from "@/lib/types";
 import { Button, Card, Input, Label, Select, cx } from "./ui";
@@ -230,6 +231,36 @@ export function StartOverForm({ current }: { current: "template" | "own" | null 
         <Input aria-label="Type RESET" value={v} onChange={(e) => setV(e.target.value)} placeholder="Type RESET" />
         <Button type="submit" variant="danger" disabled={pending || v.trim().toUpperCase() !== "RESET"}>
           {pending ? "Working…" : "Start over"}
+        </Button>
+      </form>
+      {msg && <p className={cx("mt-2 text-[13px]", msg.ok ? "text-win" : "text-loss")}>{msg.text}</p>}
+    </Card>
+  );
+}
+
+/** Site owner only: the Discord channel everyone's workout, week and month pictures post to. */
+export function DiscordForm({ current }: { current: string }) {
+  const [v, setV] = useState(current);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <Card title="Discord channel (site owner)">
+      <p className="mb-3 text-[14px] text-muted">
+        Paste a channel&apos;s webhook link (Discord: channel settings, Integrations, Webhooks, New Webhook, Copy Webhook URL). Everyone&apos;s Post to Discord goes there. Leave it empty to turn posting off.
+      </p>
+      <form
+        className="flex max-w-xl gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          start(async () => {
+            const res = await setLiftWebhook(v);
+            setMsg(res.ok ? { ok: true, text: v.trim() ? "Saved. Post to Discord is on." : "Posting is off." } : { ok: false, text: res.error });
+          });
+        }}
+      >
+        <Input aria-label="Discord webhook link" value={v} onChange={(e) => setV(e.target.value)} placeholder="https://discord.com/api/webhooks/..." />
+        <Button type="submit" disabled={pending || v.trim() === current}>
+          {pending ? "Saving…" : "Save"}
         </Button>
       </form>
       {msg && <p className={cx("mt-2 text-[13px]", msg.ok ? "text-win" : "text-loss")}>{msg.text}</p>}

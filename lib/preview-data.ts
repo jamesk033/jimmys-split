@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import owner from "./preview-owner.json";
 import { setsFromDay } from "./lift";
 import { addDays } from "./time";
 import type { ChecklistItem, ChecklistKind, Exercise, Note, SessionWithSets, WorkoutDay } from "./types";
@@ -11,11 +10,11 @@ type Owner = {
   NOTES: [string, string][];
 };
 
-/** Local preview only (PREVIEW_MODE=1): the owner split with made-up workout history, so pages can be checked without a database. */
+/** Example data for guest mode and the local preview: the owner split with made-up workout history. Never saved anywhere. */
 export function previewData(today: string) {
   let n = 0;
   const id = () => `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`;
-  const o = JSON.parse(readFileSync(path.join(process.cwd(), "lib/preview-owner.json"), "utf8")) as Owner;
+  const o = owner as unknown as Owner;
   const exercises: Exercise[] = o.EX.map(([[muscle, name, equipment], w, note, alternative, reps], i) => ({ id: id(), muscle, name, equipment, sets: 1, reps, weight_lb: w, note, alternative, position: i }));
   const days: WorkoutDay[] = o.DAYS.map(([name, ix], i) => ({ id: id(), name, position: i, exerciseIds: ix.map((x) => exercises[x].id) }));
   const checklist: ChecklistItem[] = (Object.entries(o.CHECK) as [ChecklistKind, string[]][]).flatMap(([kind, list]) => list.map((body, i) => ({ id: id(), kind, body, position: i })));

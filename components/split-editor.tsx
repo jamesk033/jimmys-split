@@ -84,7 +84,7 @@ function DayCard({ day, index, total, exercises, units, onMove, onDeleted, previ
   return (
     <li className="min-w-0 rounded-xl border border-line bg-bg">
       <div className="flex items-center gap-1 p-2">
-        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left">
+        <button data-guest-ok type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-panel2 text-[13px] font-semibold tabular-nums text-muted">{index + 1}</span>
           <span className="min-w-0">
             <span className="block truncate font-semibold">{name || day.name}</span>
@@ -121,7 +121,7 @@ function DayCard({ day, index, total, exercises, units, onMove, onDeleted, previ
                 return (
                   <li key={`${id}-${i}`} className="min-w-0 rounded-lg border border-line bg-panel">
                     <div className="flex items-center gap-1 py-1 pl-3 pr-1">
-                      <button type="button" onClick={() => setEditing(editing === i ? null : i)} aria-expanded={editing === i} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left">
+                      <button data-guest-ok type="button" onClick={() => setEditing(editing === i ? null : i)} aria-expanded={editing === i} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left">
                         <span className="min-w-0 flex-1">
                           <span className="block text-[11px] uppercase tracking-wide text-muted">{e.muscle}</span>
                           <span className="block truncate text-[15px]">{e.name}</span>
@@ -353,7 +353,7 @@ function ExerciseRow({ ex, units, onDelete, preview }: { ex: Exercise; units: Un
   const [open, setOpen] = useState(false);
   return (
     <li className="rounded-xl border border-line bg-bg">
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-14 w-full items-center gap-2 rounded-xl px-4 text-left">
+      <button data-guest-ok type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-14 w-full items-center gap-2 rounded-xl px-4 text-left">
         <span className="min-w-0 flex-1">
           <span className="block text-[11px] uppercase tracking-wide text-muted">{ex.muscle || "No muscle"}</span>
           <span className="block truncate font-semibold">{ex.name}</span>
@@ -408,7 +408,7 @@ export function SplitEditor({ days, exercises, units, preview = false }: { days:
   return (
     <div className="grid gap-4">
       <PageHeader title="The split" sub="Changes save on their own and show up in your next workout." />
-      <div role="tablist" aria-label="Split" className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-panel p-1">
+      <div data-guest-ok role="tablist" aria-label="Split" className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-panel p-1">
         {(
           [
             ["days", `Days (${days.length})`],

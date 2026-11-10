@@ -9,6 +9,8 @@ export interface LiftSettings {
   timezone: string;
   /** How they started: copied Jimmy's split, or built their own. Null until they pick. */
   setup: "template" | "own" | null;
+  /** Workout tab order, e.g. ["workout", "pre", "post", "refuel"]. Empty = default. */
+  tab_order: string[];
 }
 
 /** One lift in the exercise list. Weight lives here so it carries across every day that uses it. */

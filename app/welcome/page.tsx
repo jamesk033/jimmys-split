@@ -37,7 +37,14 @@ export default function WelcomePage() {
             Sign in
           </Link>
         </div>
-        <p className="text-[13px] text-muted">Have a Jimmy&apos;s Journal account? Same email and password works here.</p>
+        <p className="text-[13px] text-muted">
+          Have a Jimmy&apos;s Journal account? Same email and password works here.{" "}
+          {/* Full page load: /guest sets a cookie. */}
+          <a href="/guest" className="text-accent underline underline-offset-2">
+            Or look around without an account
+          </a>
+          .
+        </p>
       </section>
       <section className="grid gap-3 sm:grid-cols-2">
         {FEATURES.map(([t, d]) => (
@@ -48,6 +55,9 @@ export default function WelcomePage() {
         ))}
       </section>
       <footer className="text-[13px] text-muted">
+        <Link href="/faq" className="mr-4 hover:text-ink">
+          Help and FAQ
+        </Link>
         <Link href="/privacy" className="hover:text-ink">
           Privacy and terms
         </Link>

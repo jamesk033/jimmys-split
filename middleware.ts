@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { GUEST_COOKIE } from "./lib/guest";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/auth", "/manifest.webmanifest", "/sw.js", "/offline", "/favicon.png", "/privacy", "/welcome", "/robots.txt"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/auth", "/manifest.webmanifest", "/sw.js", "/offline", "/favicon.png", "/privacy", "/welcome", "/faq", "/guest", "/robots.txt"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -30,7 +31,8 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 
-  if (!user && !isPublic) {
+  const guest = !user && request.cookies.get(GUEST_COOKIE)?.value === "1";
+  if (!user && !isPublic && !(guest && !path.startsWith("/api/") && path !== "/mfa")) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });
     }

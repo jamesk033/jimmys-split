@@ -1,5 +1,6 @@
 "use server";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { GUEST_COOKIE } from "@/lib/guest";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,6 +19,7 @@ async function siteOrigin() {
 const safeNext = (n: string) => (n.startsWith("/") && !n.startsWith("//") ? n : "/");
 
 export async function signIn(_prev: State, formData: FormData): Promise<State> {
+  (await cookies()).delete(GUEST_COOKIE);
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const next = String(formData.get("next") ?? "/");
@@ -34,6 +36,7 @@ export async function signIn(_prev: State, formData: FormData): Promise<State> {
 }
 
 export async function signUp(_prev: State, formData: FormData): Promise<State> {
+  (await cookies()).delete(GUEST_COOKIE);
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
@@ -81,6 +84,7 @@ export async function updatePassword(_prev: State, formData: FormData): Promise<
 }
 
 export async function signOut() {
+  (await cookies()).delete(GUEST_COOKIE);
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");

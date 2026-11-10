@@ -34,7 +34,7 @@ export default async function Preview({ params, searchParams }: { params: Promis
       case "workout":
         return <WorkoutEditor session={d.live} split={d.exercises} checklist={d.checklist} units={units} preview />;
       case "done":
-        return <WorkoutEditor session={d.sessions[0]} split={d.exercises} checklist={d.checklist} units={units} prs={prsIn(d.sessions[0], all)} justFinished nextName={nextDay(d.sessions, d.days)?.name} preview />;
+        return <WorkoutEditor session={d.sessions[0]} split={d.exercises} checklist={d.checklist} units={units} prs={prsIn(d.sessions[0], all)} justFinished nextName={nextDay(d.sessions, d.days)?.name} share={{ handle: "ICT_Jimmy", discord: true }} preview />;
       case "split":
         return <SplitEditor days={d.days} exercises={d.exercises} units={units} preview />;
       case "notes":
@@ -42,7 +42,7 @@ export default async function Preview({ params, searchParams }: { params: Promis
       case "history":
         return <HistoryList sessions={d.sessions} units={units} />;
       case "calendar":
-        return <CalendarView month={today.slice(0, 7)} today={today} sessions={d.sessions} />;
+        return <CalendarView month={today.slice(0, 7)} today={today} sessions={d.sessions} share={{ handle: "ICT_Jimmy", discord: true }} />;
       case "choice":
         return <SplitChoice />;
       case "split-empty":

@@ -33,7 +33,12 @@ Lifting log (PWA) built by ICT_Jimmy (GitHub jamesk033). Sister site of Jimmy's 
 - Owner's own split, weights, checklists and notes are loaded by `0002_owner_split.sql`.
 - After sign-up: username, then lbs/kg, then choose (layout gate, `lift_settings.setup`): "Use Jimmy's split" copies the admin's (first `app_admins` row) days, exercise list, checklists and key notes via `lift_template()`, never weights; "Build my own" starts empty. Settings has "Start over" to switch (type RESET; workouts stay).
 - Paste-in import on the Split page (lib/import.ts): day name line, then "Muscle - Exercise - Equipment | weight | reps" lines, blank line between days. Reuses exercises with the same name.
+- Workout tabs: ⇅ button puts Pre-lift / Workout / Post-lift / Refuel in the user's order with up/down arrows (`lift_settings.tab_order`, `saveTabOrder`). The workout Edit panel autosaves (no Save button).
+- Share pictures (lib/share-cards.ts, canvas, 1080 wide): finished workout (History detail), month (Calendar), weekly recap (Home "This week"). Share / Download / Post to Discord (components/share-actions.tsx). Discord channel = `site_settings` key `lift_discord_webhook`, set by the admin in Settings; non-admins need `SUPABASE_SERVICE_ROLE_KEY` in Vercel env for the server to read it (lib/site-settings.ts). Feedback goes to the journal's `discord_feedback` channel.
+- /faq: Help page (public) with a feedback form for signed-in users. Help is in the nav.
+- Guest mode: "Look around without an account" (login and welcome) hits /guest, sets cookie `js_guest`; getContext returns example data (lib/preview-data.ts) and `GuestGate` blocks anything that changes data. Elements marked `data-guest-ok` stay usable (nav, tabs, expanders).
+- First-run checklist on Home (components/first-run.tsx, hide saved in localStorage).
 - No tick boxes on sets: a set with reps is done (`isDone`). The set number turns green once reps are in. Each exercise in a workout has Edit: change details (saves to exercise list), swap to the alternative for today, or remove from this workout.
 
 ## Ideas not built yet (only if asked)
-- Share image of a workout, push reminders, guest mode, rest timer, plate calculator, bodyweight chart.
+- Push reminders, rest timer, plate calculator, bodyweight chart.

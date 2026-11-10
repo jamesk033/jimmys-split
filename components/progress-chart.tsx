@@ -20,7 +20,7 @@ export function ProgressChart({ series, units }: { series: ProgressSeries; units
   if (!names.length) return <Empty title="No lifts logged yet">Finish a workout and your progress shows up here.</Empty>;
   return (
     <div className="grid gap-3">
-      <Select aria-label="Lift" value={name} onChange={(e) => setName(e.target.value)} className="sm:max-w-xs">
+      <Select data-guest-ok aria-label="Lift" value={name} onChange={(e) => setName(e.target.value)} className="sm:max-w-xs">
         {names.map((n) => (
           <option key={n} value={n}>
             {n}

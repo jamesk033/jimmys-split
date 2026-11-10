@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { deleteWorkout, finishWorkout, saveExercise, saveWorkout } from "@/app/actions/lift";
+import { deleteWorkout, finishWorkout, saveExercise, saveTabOrder, saveWorkout } from "@/app/actions/lift";
 import { groupSets, isDone, setsDone, shouldGoUp, volume, type Best } from "@/lib/lift";
 import { longDate } from "@/lib/time";
 import { type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight, fromUnit, stepFor, toUnit } from "@/lib/units";
-import { IconCheck, IconPlus, IconTrophy, IconX } from "./icons";
+import { IconCheck, IconDown, IconPlus, IconTrophy, IconUp, IconX } from "./icons";
 import { ConfirmDelete } from "./confirm-delete";
+import { WorkoutShare } from "./share-cards";
 import { NumField } from "./num-field";
 import { SaveBadge, useAutosave } from "./use-autosave";
 import { Badge, Button, Card, Empty, Input, Label, PageHeader, Progress, Textarea, buttonClass, cx } from "./ui";
@@ -18,64 +19,63 @@ type Tab = "pre" | "workout" | "post" | "refuel";
 type Group = ReturnType<typeof groupSets>[number];
 
 /** Change an exercise mid-workout: details save to your exercise list; swap and remove only touch this workout. */
-function EditPanel({ g, ex, onSaved, onRename, onSwap, onRemove, onClose, preview }: { g: Group; ex?: Exercise; onSaved: (e: Exercise) => void; onRename: (name: string, target: string) => void; onSwap: (name: string) => void; onRemove: () => void; onClose: () => void; preview: boolean }) {
+function EditPanel({ g, ex, onSaved, onRename, onSwap, onRemove, preview }: { g: Group; ex?: Exercise; onSaved: (e: Exercise) => void; onRename: (name: string, target: string) => void; onSwap: (name: string) => void; onRemove: () => void; preview: boolean }) {
   const [v, setV] = useState({ name: ex?.name ?? g.name, muscle: ex?.muscle ?? "", equipment: ex?.equipment ?? "", reps: ex?.reps ?? g.target, note: ex?.note ?? "", alternative: ex?.alternative ?? "" });
-  const [err, setErr] = useState("");
-  const [pending, start] = useTransition();
-  const save = () =>
-    start(async () => {
-      setErr("");
-      const name = v.name.trim() || g.name;
-      if (ex) {
-        const next = { ...ex, ...v, name };
-        const res = await saveExercise({ id: ex.id, muscle: next.muscle, name, equipment: next.equipment, sets: ex.sets, reps: next.reps, weight_lb: ex.weight_lb, note: next.note, alternative: next.alternative });
-        if (!res.ok) return setErr(res.error);
-        onSaved(next);
-      }
-      onRename(name, v.reps);
-      onClose();
-    });
+  const name = v.name.trim() || g.name;
+  // Saves to the exercise list on its own (exercises from the split only).
+  const save = useAutosave(ex ? { id: ex.id, muscle: v.muscle, name, equipment: v.equipment, sets: ex.sets, reps: v.reps, weight_lb: ex.weight_lb, note: v.note, alternative: v.alternative } : null, saveExercise, { enabled: !!ex && !preview });
+  const update = (patch: Partial<typeof v>) => {
+    const next = { ...v, ...patch };
+    setV(next);
+    if (ex) {
+      onSaved({ ...ex, ...next, name: next.name.trim() || ex.name });
+      onRename(next.name.trim() || g.name, next.reps);
+    }
+  };
   return (
     <div className="mb-3 grid gap-2 rounded-xl border border-accent/40 bg-bg p-3">
       <div className="grid grid-cols-2 gap-2">
-        <label className="col-span-2 grid gap-1 text-[12px] text-muted">
+        <label className="col-span-2 grid min-w-0 gap-1 text-[12px] text-muted">
           Exercise
-          <Input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} maxLength={120} />
+          <Input
+            value={v.name}
+            onChange={(e) => update({ name: e.target.value })}
+            // A one-off exercise is renamed when you leave the box, so the card doesn't jump while typing.
+            onBlur={() => !ex && onRename(name, v.reps)}
+            maxLength={120}
+          />
         </label>
         {ex && (
           <>
-            <label className="grid gap-1 text-[12px] text-muted">
+            <label className="grid min-w-0 gap-1 text-[12px] text-muted">
               Muscle
-              <Input value={v.muscle} onChange={(e) => setV({ ...v, muscle: e.target.value })} maxLength={60} />
+              <Input value={v.muscle} onChange={(e) => update({ muscle: e.target.value })} maxLength={60} />
             </label>
-            <label className="grid gap-1 text-[12px] text-muted">
+            <label className="grid min-w-0 gap-1 text-[12px] text-muted">
               Equipment
-              <Input value={v.equipment} onChange={(e) => setV({ ...v, equipment: e.target.value })} maxLength={120} />
+              <Input value={v.equipment} onChange={(e) => update({ equipment: e.target.value })} maxLength={120} />
             </label>
           </>
         )}
-        <label className="grid gap-1 text-[12px] text-muted">
+        <label className="grid min-w-0 gap-1 text-[12px] text-muted">
           Rep range
-          <Input value={v.reps} onChange={(e) => setV({ ...v, reps: e.target.value })} maxLength={20} placeholder="4-8" />
+          <Input value={v.reps} onChange={(e) => update({ reps: e.target.value })} onBlur={() => !ex && onRename(name, v.reps)} maxLength={20} placeholder="4-8" />
         </label>
         {ex && (
-          <label className="grid gap-1 text-[12px] text-muted">
+          <label className="grid min-w-0 gap-1 text-[12px] text-muted">
             Alternative
-            <Input value={v.alternative} onChange={(e) => setV({ ...v, alternative: e.target.value })} maxLength={200} />
+            <Input value={v.alternative} onChange={(e) => update({ alternative: e.target.value })} maxLength={200} />
           </label>
         )}
         {ex && (
-          <label className="col-span-2 grid gap-1 text-[12px] text-muted">
+          <label className="col-span-2 grid min-w-0 gap-1 text-[12px] text-muted">
             Notes
-            <Textarea value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} maxLength={500} className="min-h-16" />
+            <Textarea value={v.note} onChange={(e) => update({ note: e.target.value })} maxLength={500} className="min-h-16" />
           </label>
         )}
       </div>
-      {ex && <p className="text-[12px] text-muted">Saves to your exercise list, so every day that uses it updates.</p>}
+      {ex && (save.state !== "idle" ? <SaveBadge state={save.state} error={save.error} /> : <p className="text-[12px] text-muted">Saves on its own to your exercise list, so every day that uses it updates.</p>)}
       <div className="flex flex-wrap gap-2">
-        <Button onClick={save} disabled={pending || preview}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
         {ex?.alternative && (
           <Button variant="ghost" onClick={() => onSwap(ex.alternative)} disabled={preview}>
             Swap to alternative today
@@ -86,11 +86,7 @@ function EditPanel({ g, ex, onSaved, onRename, onSwap, onRemove, onClose, previe
             Remove from this workout
           </ConfirmDelete>
         )}
-        <button type="button" onClick={onClose} className="min-h-11 px-2 text-[14px] text-muted">
-          Cancel
-        </button>
       </div>
-      {err && <p className="text-[13px] text-loss">{err}</p>}
     </div>
   );
 }
@@ -138,6 +134,8 @@ export function WorkoutEditor({
   justFinished = false,
   nextName,
   preview = false,
+  tabOrder = [],
+  share,
 }: {
   session: SessionWithSets;
   /** The exercise list (for notes and next-time weights). */
@@ -149,6 +147,10 @@ export function WorkoutEditor({
   /** Next day in the rotation, shown after finishing. */
   nextName?: string;
   preview?: boolean;
+  /** Your order for the tabs (saved in Settings data); empty = Pre-lift, Workout, Post-lift, Refuel. */
+  tabOrder?: string[];
+  /** Finished workouts: username for the picture, and whether the Discord channel is set up. */
+  share?: { handle: string; discord: boolean };
 }) {
   const router = useRouter();
   const live = session.status === "active";
@@ -173,7 +175,25 @@ export function WorkoutEditor({
   const refuelItems = items("refuel");
   const count = (list: ChecklistItem[], done: string[]) => list.filter((i) => done.includes(i.body)).length;
 
-  const [tab, setTab] = useState<Tab>(() => (live && preItems.length && count(preItems, session.pre_done) < preItems.length && !setsDone(session.sets) ? "pre" : "workout"));
+  const DEFAULT_ORDER: Tab[] = ["pre", "workout", "post", "refuel"];
+  const [order, setOrder] = useState<Tab[]>(() => (tabOrder.length === 4 && DEFAULT_ORDER.every((k) => tabOrder.includes(k)) ? (tabOrder as Tab[]) : DEFAULT_ORDER));
+  const [reordering, setReordering] = useState(false);
+  const [orderErr, setOrderErr] = useState("");
+  const [tab, setTab] = useState<Tab>(() => {
+    if (setsDone(session.sets) || !live) return "workout";
+    const first = order[0];
+    if (first === "pre" && !(preItems.length && count(preItems, session.pre_done) < preItems.length)) return "workout";
+    return first;
+  });
+  const moveTab = (i: number, d: -1 | 1) => {
+    const next = [...order];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    setOrder(next);
+    if (!preview)
+      saveTabOrder(next)
+        .then((r) => setOrderErr(r.ok ? "" : r.error))
+        .catch(() => setOrderErr("Couldn't save. Check your connection."));
+  };
 
   const payload = useMemo(
     () => ({ id: session.id, date, pre_done: pre, post_done: post, refuel_done: refuel, bodyweight_lb: bodyweight, notes, sets, next }),
@@ -278,8 +298,9 @@ export function WorkoutEditor({
 
       <Progress value={sets.length ? doneCount / sets.length : 0} tone={doneCount === sets.length && sets.length ? "win" : "accent"} label="Sets done" />
 
-      <div role="tablist" aria-label="Workout parts" className="grid grid-cols-4 gap-1 rounded-xl border border-line bg-panel p-1">
-        {TABS.map(([k, label, c]) => (
+      <div data-guest-ok className="flex items-stretch gap-1">
+      <div role="tablist" aria-label="Workout parts" className="grid min-w-0 flex-1 grid-cols-4 gap-1 rounded-xl border border-line bg-panel p-1">
+        {order.map((k) => TABS.find((t) => t[0] === k)!).map(([k, label, c]) => (
           <button
             key={k}
             type="button"
@@ -293,6 +314,37 @@ export function WorkoutEditor({
           </button>
         ))}
       </div>
+        <button
+          type="button"
+          aria-pressed={reordering}
+          aria-label="Reorder tabs"
+          title="Reorder tabs"
+          onClick={() => setReordering((x) => !x)}
+          className={cx("grid w-10 shrink-0 place-items-center rounded-xl border border-line text-[17px]", reordering ? "bg-accent text-accent-ink" : "bg-panel text-muted hover:text-ink")}
+        >
+          ⇅
+        </button>
+      </div>
+
+      {reordering && (
+        <div data-guest-ok className="rounded-2xl border border-accent/50 bg-panel p-3">
+          <p className="mb-2 text-[13px] text-muted">Use the arrows to put the tabs in your order. Saves on its own; tap ⇅ to close.</p>
+          <ol className="grid gap-1.5">
+            {order.map((k, i) => (
+              <li key={k} className="flex items-center gap-1 rounded-xl border border-line bg-bg pl-4 pr-1 text-[15px] font-semibold">
+                <span className="flex-1 py-2.5">{TABS.find((t) => t[0] === k)![1]}</span>
+                <button type="button" aria-label={`Move ${k} up`} disabled={i === 0} onClick={() => moveTab(i, -1)} className="grid h-11 w-10 place-items-center rounded-lg text-muted hover:text-ink disabled:opacity-30">
+                  <IconUp width={18} height={18} />
+                </button>
+                <button type="button" aria-label={`Move ${k} down`} disabled={i === order.length - 1} onClick={() => moveTab(i, 1)} className="grid h-11 w-10 place-items-center rounded-lg text-muted hover:text-ink disabled:opacity-30">
+                  <IconDown width={18} height={18} />
+                </button>
+              </li>
+            ))}
+          </ol>
+          {orderErr && <p className="mt-2 text-[13px] text-loss">{orderErr}</p>}
+        </div>
+      )}
 
       {tab === "pre" && (
         <Card title="Pre-lift checklist">
@@ -339,7 +391,6 @@ export function WorkoutEditor({
                     g={g}
                     ex={ex}
                     preview={preview}
-                    onClose={() => setEditing(null)}
                     onSaved={(e) => setExList((l) => l.map((x) => (x.id === e.id ? e : x)))}
                     onRename={(name, target) => setSets((all) => all.map((s) => (inGroup(g, s) ? { ...s, name, target_reps: target } : s)))}
                     onSwap={(name) => {
@@ -472,6 +523,33 @@ export function WorkoutEditor({
           {pending ? "Finishing…" : doneCount < sets.length ? `Finish workout (${sets.length - doneCount} sets left)` : "Finish workout"}
         </Button>
       ) : (
+        <>
+        {share && (
+          <Card title="Share">
+            <WorkoutShare
+              filename={`${(session.day_name || "workout").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${date}.png`}
+              discord={share.discord ? { title: `${session.day_name || "Workout"} · ${longDate(date)}`, session: session.id } : null}
+              data={{
+                dayName: session.day_name || "Workout",
+                dateLabel: longDate(date),
+                setsDone: doneCount,
+                setsTotal: sets.length,
+                volume: fmtBig(volume(sets), units),
+                handle: share.handle,
+                exercises: groups.map((g) => {
+                  const top = [...g.sets].filter((x) => x.done && x.weight_lb !== null).sort((a, b) => (b.weight_lb ?? 0) - (a.weight_lb ?? 0))[0];
+                  const ex = g.exerciseId ? splitById.get(g.exerciseId) : undefined;
+                  return {
+                    muscle: ex?.muscle ?? "",
+                    name: g.name,
+                    top: top ? `${fmtWeight(top.weight_lb, units)} x ${top.reps ?? "?"}` : g.sets.some((x) => x.done) ? `${g.sets.find((x) => x.done)?.reps ?? "?"} reps` : "skipped",
+                    pr: prs.some((p) => p.name.trim().toLowerCase() === g.name.trim().toLowerCase()),
+                  };
+                }),
+              }}
+            />
+          </Card>
+        )}
         <div className="flex flex-wrap justify-between gap-2">
           <Link href="/history" className={buttonClass("ghost")}>
             All workouts
@@ -482,6 +560,7 @@ export function WorkoutEditor({
             </ConfirmDelete>
           )}
         </div>
+        </>
       )}
     </div>
   );

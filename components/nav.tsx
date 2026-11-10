@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cx } from "./ui";
-import { IconCalendar, IconDashboard, IconDumbbell, IconMore, IconNotes, IconSettings, IconSplit, IconTrades, IconX } from "./icons";
+import { IconCalendar, IconDashboard, IconDumbbell, IconHelp, IconMore, IconNotes, IconSettings, IconSplit, IconTrades, IconX } from "./icons";
 
 const ITEMS = [
   { href: "/", label: "Home", icon: IconDashboard },
@@ -12,7 +12,10 @@ const ITEMS = [
   { href: "/split", label: "Split", icon: IconSplit },
   { href: "/notes", label: "Key notes", icon: IconNotes },
 ];
-const BOTTOM = [{ href: "/settings", label: "Settings", icon: IconSettings }];
+const BOTTOM = [
+  { href: "/faq", label: "Help", icon: IconHelp },
+  { href: "/settings", label: "Settings", icon: IconSettings },
+];
 
 const active = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
 
@@ -48,7 +51,7 @@ export function Nav({ email, live = false }: { email: string; live?: boolean }) 
   const cta = live ? "Resume workout" : "Workout";
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col gap-5 overflow-y-auto border-r border-line bg-panel/80 px-3 py-5 backdrop-blur lg:flex">
+      <aside data-guest-ok className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col gap-5 overflow-y-auto border-r border-line bg-panel/80 px-3 py-5 backdrop-blur lg:flex">
         <div className="px-2">
           <Brand />
         </div>
@@ -71,7 +74,7 @@ export function Nav({ email, live = false }: { email: string; live?: boolean }) 
         <Brand />
       </header>
 
-      <nav aria-label="Tabs" className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-line bg-bg/95 px-1 pt-1 backdrop-blur lg:hidden">
+      <nav data-guest-ok aria-label="Tabs" className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-line bg-bg/95 px-1 pt-1 backdrop-blur lg:hidden">
         {(
           [
             ["/", "Home", IconDashboard],
@@ -101,7 +104,7 @@ export function Nav({ email, live = false }: { email: string; live?: boolean }) 
       </nav>
 
       {open && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+        <div data-guest-ok className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <button type="button" className="absolute inset-0 bg-black/60" aria-label="Close menu" onClick={() => setOpen(false)} />
           <div className="safe-top absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col gap-4 overflow-y-auto border-r border-line bg-panel p-4">
             <div className="flex items-center justify-between">

@@ -53,7 +53,7 @@ export function StartWorkout({
 
       <div>
         <Label htmlFor="day">Workout</Label>
-        <Select id="day" value={dayId} onChange={(e) => setDayId(e.target.value)} className="sm:max-w-xs">
+        <Select data-guest-ok id="day" value={dayId} onChange={(e) => setDayId(e.target.value)} className="sm:max-w-xs">
           {days.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}

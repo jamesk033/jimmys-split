@@ -3,6 +3,7 @@ import { setsDone } from "@/lib/lift";
 import { addDays, weekdayOf } from "@/lib/time";
 import { isLower, shortDay, type SessionWithSets } from "@/lib/types";
 import { IconChevronLeft, IconChevronRight } from "./icons";
+import { MonthShare } from "./share-cards";
 import { Card, PageHeader, cx } from "./ui";
 
 const shiftMonth = (m: string, n: number) => {
@@ -11,7 +12,7 @@ const shiftMonth = (m: string, n: number) => {
 };
 
 /** Month grid: purple = upper days, green = lower days, gray = rest. Tap a day to open the workout. */
-export function CalendarView({ month, today, sessions }: { month: string; today: string; sessions: SessionWithSets[] }) {
+export function CalendarView({ month, today, sessions, share }: { month: string; today: string; sessions: SessionWithSets[]; share?: { handle: string; discord: boolean } }) {
   const first = `${month}-01`;
   const days = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 0)).getUTCDate();
   const lead = (weekdayOf(first) + 6) % 7; // weeks start Monday
@@ -76,6 +77,30 @@ export function CalendarView({ month, today, sessions }: { month: string; today:
           })}
         </div>
       </Card>
+      {share && (
+        <Card title="Share">
+          <MonthShare
+            filename={`split-${month}.png`}
+            discord={share.discord ? { title: label } : null}
+            data={{
+              monthLabel: label,
+              first,
+              days,
+              workouts: inMonth.length,
+              rests,
+              handle: share.handle,
+              marks: Object.fromEntries(
+                [...byDate.entries()]
+                  .filter(([d]) => d.startsWith(month))
+                  .map(([d, list]) => {
+                    const s = list.find((x) => !x.rest) ?? list[0];
+                    return [d, { label: s.rest ? "Rest" : shortDay(s.day_name), tone: s.rest ? ("rest" as const) : isLower(s.day_name) ? ("lower" as const) : ("upper" as const) }];
+                  }),
+              ),
+            }}
+          />
+        </Card>
+      )}
     </div>
   );
 }

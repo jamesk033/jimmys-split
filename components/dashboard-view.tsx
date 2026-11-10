@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { Best, Summary } from "@/lib/lift";
 import { setsDone, volume } from "@/lib/lift";
 import { shortDate } from "@/lib/time";
@@ -18,7 +19,11 @@ export function DashboardView({
   bests,
   series,
   units,
+  firstRun,
+  week,
 }: {
+  firstRun?: ReactNode;
+  week?: ReactNode;
   name: string;
   summary: Summary;
   next: string | null;
@@ -33,6 +38,7 @@ export function DashboardView({
   return (
     <div className="grid gap-4">
       <PageHeader eyebrow="Welcome back" title={name} />
+      {firstRun}
 
       <Link
         href="/workout"
@@ -58,6 +64,8 @@ export function DashboardView({
         <Stat label="Moved this week" value={fmtBig(summary.weekVolume, units)} sub="weight x reps" icon={IconTrendUp} />
         <Stat label="Bodyweight" value={summary.lastBodyweight ? fmtWeight(summary.lastBodyweight, units) : "–"} sub="last logged" icon={IconScale} />
       </StatGrid>
+
+      {week}
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card title="Progress">

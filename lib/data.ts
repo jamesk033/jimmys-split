@@ -1,7 +1,10 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { GUEST_COOKIE } from "./guest";
+import { previewData } from "./preview-data";
 import { DEFAULT_CHECKLIST, DEFAULT_DAYS, DEFAULT_EXERCISES, DEFAULT_NOTES } from "./defaults";
 import { createClient, type ServerSupabase } from "./supabase/server";
 import { unloggedDays } from "./lift";
@@ -14,7 +17,14 @@ export interface AppContext {
   email: string;
   username: string | null;
   settings: LiftSettings;
+  /** Looking around without an account: example data, nothing saves. */
+  guest: boolean;
+  /** Site owner (first account, same admin as Jimmy's Journal). */
+  isAdmin: boolean;
 }
+
+/** Example data for guests, one copy per request. */
+const guestData = cache(() => previewData(todayIn(DEFAULT_TZ)));
 
 type Template = {
   exercises: { id: string; muscle: string; name: string; equipment: string; sets: number; reps: string; note: string; alternative: string; position: number }[];
@@ -69,7 +79,11 @@ export const getContext = cache(async (): Promise<AppContext> => {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    if ((await cookies()).get(GUEST_COOKIE)?.value === "1")
+      return { supabase, userId: "guest", email: "", username: "guest", guest: true, isAdmin: false, settings: { user_id: "guest", units: "lb", timezone: DEFAULT_TZ, setup: "template", tab_order: [] } };
+    redirect("/login");
+  }
 
   // Username is shared with Jimmy's Split.
   let { data: shared } = await supabase.from("user_settings").select("username").eq("user_id", user.id).maybeSingle();
@@ -86,22 +100,27 @@ export const getContext = cache(async (): Promise<AppContext> => {
     ({ data: row } = await supabase.from("lift_settings").select("*").eq("user_id", user.id).maybeSingle());
   }
   if (row?.setup) await backfillRestDays(supabase, user.id, (row.timezone as string) || DEFAULT_TZ);
+  const { data: admin } = await supabase.rpc("is_admin");
   return {
+    guest: false,
+    isAdmin: admin === true,
     supabase,
     userId: user.id,
     email: user.email ?? "",
     username: (shared?.username as string | null) ?? null,
-    settings: { user_id: user.id, units: row?.units === "kg" ? "kg" : row?.units === "lb" ? "lb" : null, timezone: (row?.timezone as string) || DEFAULT_TZ, setup: row?.setup === "template" || row?.setup === "own" ? row.setup : null },
+    settings: { user_id: user.id, units: row?.units === "kg" ? "kg" : row?.units === "lb" ? "lb" : null, timezone: (row?.timezone as string) || DEFAULT_TZ, setup: row?.setup === "template" || row?.setup === "own" ? row.setup : null, tab_order: Array.isArray(row?.tab_order) ? (row.tab_order as string[]) : [] },
   };
 });
 
 export async function getExercises(ctx: AppContext): Promise<Exercise[]> {
+  if (ctx.guest) return guestData().exercises;
   const { data } = await ctx.supabase.from("lift_exercises").select("*").order("position").order("created_at");
   return (data ?? []).map(normalizeExercise);
 }
 
 /** Removes exercises that are on no day (leftovers from before this rule). */
 export async function removeUnusedExercises(ctx: AppContext, days: WorkoutDay[], exercises: Exercise[]): Promise<Exercise[]> {
+  if (ctx.guest) return exercises;
   const used = new Set(days.flatMap((d) => d.exerciseIds));
   const gone = exercises.filter((e) => !used.has(e.id)).map((e) => e.id);
   if (gone.length) await ctx.supabase.from("lift_exercises").delete().in("id", gone);
@@ -110,6 +129,7 @@ export async function removeUnusedExercises(ctx: AppContext, days: WorkoutDay[],
 
 /** Workout days in rotation order, each with its exercise ids in order. */
 export async function getDays(ctx: AppContext): Promise<WorkoutDay[]> {
+  if (ctx.guest) return guestData().days;
   const [{ data: days }, { data: items }] = await Promise.all([
     ctx.supabase.from("lift_days").select("id,name,position").order("position").order("created_at"),
     ctx.supabase.from("lift_day_exercises").select("day_id,exercise_id,position").order("position").order("created_at"),
@@ -123,17 +143,23 @@ export async function getDays(ctx: AppContext): Promise<WorkoutDay[]> {
 }
 
 export async function getChecklist(ctx: AppContext): Promise<ChecklistItem[]> {
+  if (ctx.guest) return guestData().checklist;
   const { data } = await ctx.supabase.from("lift_checklist_items").select("id,kind,body,position").order("kind").order("position").order("created_at");
   return (data ?? []) as ChecklistItem[];
 }
 
 export async function getNotes(ctx: AppContext): Promise<Note[]> {
+  if (ctx.guest) return guestData().notes;
   const { data } = await ctx.supabase.from("lift_notes").select("id,title,body,position").order("position").order("created_at");
   return (data ?? []) as Note[];
 }
 
 /** Workouts with their sets, newest first. */
 export async function getSessions(ctx: AppContext, opts: { from?: string; to?: string; id?: string } = {}): Promise<SessionWithSets[]> {
+  if (ctx.guest) {
+    const g = guestData();
+    return [g.live, ...g.sessions].filter((s) => (!opts.id || s.id === opts.id) && (!opts.from || s.date >= opts.from) && (!opts.to || s.date <= opts.to));
+  }
   let q = ctx.supabase.from("lift_sessions").select("*").order("date", { ascending: false }).order("started_at", { ascending: false });
   if (opts.from) q = q.gte("date", opts.from);
   if (opts.to) q = q.lte("date", opts.to);
