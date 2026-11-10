@@ -91,6 +91,10 @@ function DayCard({ day, index, grip, exercises, units, onDeleted, preview }: { d
   const byId = new Map(exercises.map((e) => [e.id, e]));
   const byName = new Map(exercises.map((e) => [e.name.trim().toLowerCase(), e.id]));
   const nameSave = useAutosave({ id: day.id, name: name.trim() || day.name }, saveDay, { enabled: !preview });
+  // Warnings: typing an exercise that's already here, or one that's on the day twice.
+  const typed = byName.get(pick.trim().toLowerCase());
+  const dupe = !!typed && ids.includes(typed);
+  const twice = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))].map((id) => byId.get(id)?.name ?? "").filter(Boolean);
   useEffect(() => setIds(day.exerciseIds), [day.exerciseIds]);
 
   const commit = (next: string[], refresh = false) => {
@@ -107,7 +111,9 @@ function DayCard({ day, index, grip, exercises, units, onDeleted, preview }: { d
     const n = pick.trim();
     if (!n) return;
     const existing = byName.get(n.toLowerCase());
+    if (existing && ids.includes(existing)) return setErr(`${byId.get(existing)?.name ?? n} is already on ${name || day.name}.`);
     if (existing) {
+      setErr("");
       commit([...ids, existing]);
       setPick("");
       return;
@@ -198,7 +204,7 @@ function DayCard({ day, index, grip, exercises, units, onDeleted, preview }: { d
           add();
         }}
       >
-        <Input aria-label={`Add an exercise to ${day.name}`} list={`ex-${day.id}`} value={pick} onChange={(e) => setPick(e.target.value)} maxLength={120} placeholder="Add an exercise" />
+        <Input aria-label={`Add an exercise to ${day.name}`} list={`ex-${day.id}`} value={pick} onChange={(e) => { setPick(e.target.value); setErr(""); }} maxLength={120} placeholder="Add an exercise" className={dupe ? "border-amber-400/70" : undefined} />
         <datalist id={`ex-${day.id}`}>
           {exercises.map((e) => (
             <option key={e.id} value={e.name}>
@@ -206,10 +212,12 @@ function DayCard({ day, index, grip, exercises, units, onDeleted, preview }: { d
             </option>
           ))}
         </datalist>
-        <Button type="submit" variant="subtle" disabled={!pick.trim() || pending || preview}>
+        <Button type="submit" variant="subtle" disabled={!pick.trim() || pending || preview || dupe}>
           Add
         </Button>
       </form>
+      {dupe && <p className="text-[13px] font-semibold text-amber-300">{byId.get(byName.get(pick.trim().toLowerCase())!)?.name} is already on this day.</p>}
+      {twice.length > 0 && <p className="text-[13px] font-semibold text-amber-300">On this day twice: {twice.join(", ")}. Remove one with its ✕.</p>}
       {err && <p className="text-[13px] text-loss">{err}</p>}
     </div>
   );
@@ -284,6 +292,12 @@ function TextEditor({ days, exercises, units, preview, onDone }: { days: Workout
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
   const parsed = parseSplit(text);
+  const repeats = parsed.flatMap((d) => {
+    const seen = new Set<string>();
+    const twice = new Set<string>();
+    for (const x of d.exercises) (seen.has(x.name.toLowerCase()) ? twice : seen).add(x.name.toLowerCase());
+    return [...twice].map((n) => `${d.name}: ${d.exercises.find((x) => x.name.toLowerCase() === n)!.name}`);
+  });
   const count = parsed.reduce((t, d) => t + d.exercises.length, 0);
   return (
     <Card title="Edit as text">
@@ -298,6 +312,7 @@ function TextEditor({ days, exercises, units, preview, onDone }: { days: Workout
       <p className="mt-2 text-[13px] text-muted">
         {parsed.length} {parsed.length === 1 ? "day" : "days"}, {count} exercises
       </p>
+      {repeats.length > 0 && <p className="mt-1 text-[13px] font-semibold text-amber-300">Listed twice on the same day (only one is kept): {repeats.join("; ")}.</p>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button
           disabled={pending || preview || text === start0}
@@ -473,6 +488,8 @@ function ExerciseList({ exercises, days, units, preview }: { exercises: Exercise
   const [pending, start] = useTransition();
   useEffect(() => setList(exercises), [exercises]);
   const daysOf = (id: string) => days.filter((d) => d.exerciseIds.includes(id));
+  const typedId = exercises.find((e) => e.name.trim().toLowerCase() === name.trim().toLowerCase())?.id;
+  const hasIt = (d: WorkoutDay) => !!typedId && d.exerciseIds.includes(typedId);
 
   return (
     <div className="grid gap-4">
@@ -487,11 +504,12 @@ function ExerciseList({ exercises, days, units, preview }: { exercises: Exercise
               start(async () => {
                 setMsg(null);
                 // Put it on each picked day; the first one creates it, the rest reuse it.
-                for (const dayId of days.filter((d) => onDays.includes(d.id)).map((d) => d.id)) {
+                const picked = days.filter((d) => onDays.includes(d.id) && !hasIt(d));
+                for (const dayId of picked.map((d) => d.id)) {
                   const res = await addToDay(dayId, n);
                   if (!res.ok) return setMsg({ ok: false, text: res.error });
                 }
-                setMsg({ ok: true, text: `Added ${n} to ${onDays.length} ${onDays.length === 1 ? "day" : "days"}. Tap it below to fill in the details.` });
+                setMsg({ ok: true, text: `Added ${n} to ${picked.length} ${picked.length === 1 ? "day" : "days"}. Tap it below to fill in the details.` });
                 setName("");
                 setOnDays([]);
                 router.refresh();
@@ -510,23 +528,32 @@ function ExerciseList({ exercises, days, units, preview }: { exercises: Exercise
               <p className="mb-1.5 text-[13px] text-muted">Put it on these days</p>
               <div className="flex flex-wrap gap-1.5">
                 {days.map((d) => {
-                  const on = onDays.includes(d.id);
+                  const already = hasIt(d);
+                  const on = !already && onDays.includes(d.id);
                   return (
                     <button
                       key={d.id}
                       type="button"
                       aria-pressed={on}
+                      disabled={already}
+                      title={already ? "Already on this day" : undefined}
                       onClick={() => setOnDays((x) => (on ? x.filter((y) => y !== d.id) : [...x, d.id]))}
-                      className={cx("min-h-10 rounded-lg border px-3 text-[14px]", on ? "border-accent bg-accent/15 font-semibold text-ink" : "border-line bg-bg text-muted hover:text-ink")}
+                      className={cx("min-h-10 rounded-lg border px-3 text-[14px]", already ? "border-amber-400/50 bg-amber-400/10 text-amber-300" : on ? "border-accent bg-accent/15 font-semibold text-ink" : "border-line bg-bg text-muted hover:text-ink")}
                     >
                       {d.name}
+                      {already && " ✓"}
                     </button>
                   );
                 })}
               </div>
             </div>
+            {days.some(hasIt) && (
+              <p className="text-[13px] font-semibold text-amber-300">
+                Already on {days.filter(hasIt).map((d) => d.name).join(", ")}. Those days are skipped.
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" disabled={pending || preview || !name.trim() || !onDays.length}>
+              <Button type="submit" disabled={pending || preview || !name.trim() || !onDays.filter((id) => !days.some((d) => d.id === id && hasIt(d))).length}>
                 {pending ? "Adding…" : "Add exercise"}
               </Button>
               {!onDays.length && name.trim() && <span className="text-[13px] text-muted">Pick at least one day.</span>}

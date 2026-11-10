@@ -309,6 +309,11 @@ export async function addToDay(dayId: string, rawName: string): Promise<ActionRe
     const { error } = await ctx.supabase.from("lift_exercises").insert({ id, user_id: ctx.userId, muscle: "", name: name[0].toUpperCase() + name.slice(1), equipment: "", sets: 1, reps: "4-8", position: (last?.[0]?.position ?? -1) + 1 });
     if (error) return fail(error);
   }
+  const { data: already } = await ctx.supabase.from("lift_day_exercises").select("id").eq("day_id", dayId).eq("exercise_id", id).limit(1);
+  if (already?.length) {
+    const { data: d } = await ctx.supabase.from("lift_days").select("name").eq("id", dayId).maybeSingle();
+    return { ok: false, error: `${name} is already on ${d?.name ?? "this day"}.` };
+  }
   const { data: lastItem } = await ctx.supabase.from("lift_day_exercises").select("position").eq("day_id", dayId).order("position", { ascending: false }).limit(1);
   const { error } = await ctx.supabase.from("lift_day_exercises").insert({ user_id: ctx.userId, day_id: dayId, exercise_id: id, position: (lastItem?.[0]?.position ?? -1) + 1 });
   if (error) return fail(error);
