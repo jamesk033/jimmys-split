@@ -177,6 +177,17 @@ export async function deleteExercise(id: string): Promise<ActionResult> {
   return fail(error);
 }
 
+/** An exercise that's on no day leaves the exercise list. Past workouts keep their sets. */
+async function pruneUnused(ctx: Awaited<ReturnType<typeof getContext>>) {
+  const [{ data: used }, { data: all }] = await Promise.all([
+    ctx.supabase.from("lift_day_exercises").select("exercise_id"),
+    ctx.supabase.from("lift_exercises").select("id"),
+  ]);
+  const keep = new Set((used ?? []).map((r) => String(r.exercise_id)));
+  const gone = (all ?? []).map((r) => String(r.id)).filter((id) => !keep.has(id));
+  if (gone.length) await ctx.supabase.from("lift_exercises").delete().in("id", gone);
+}
+
 // ---------- workout days ----------
 
 export async function saveDay(raw: unknown): Promise<ActionResult> {
@@ -196,7 +207,8 @@ export async function deleteDay(id: string): Promise<ActionResult> {
   if (!uuid.safeParse(id).success) return { ok: false, error: "Unknown day." };
   const ctx = await getContext();
   const { error } = await ctx.supabase.from("lift_days").delete().eq("id", id);
-  revalidatePath("/split");
+  if (!error) await pruneUnused(ctx);
+  revalidatePath("/", "layout");
   return fail(error);
 }
 
@@ -210,7 +222,8 @@ export async function setDayExercises(dayId: string, exerciseIds: string[]): Pro
     const { error: e2 } = await ctx.supabase.from("lift_day_exercises").insert(exerciseIds.map((exercise_id, position) => ({ user_id: ctx.userId, day_id: dayId, exercise_id, position })));
     if (e2) return fail(e2);
   }
-  revalidatePath("/split");
+  await pruneUnused(ctx);
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

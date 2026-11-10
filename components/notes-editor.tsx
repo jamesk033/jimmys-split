@@ -3,13 +3,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { deleteChecklistItem, deleteNote, reorder, saveChecklistItem, saveNote } from "@/app/actions/lift";
 import { KIND_LABEL, type ChecklistItem, type ChecklistKind, type Note } from "@/lib/types";
+import { ConfirmDelete } from "./confirm-delete";
 import { IconDown, IconTrash, IconUp } from "./icons";
 import { SaveBadge, useAutosave } from "./use-autosave";
 import { Button, Card, Empty, Input, PageHeader, Textarea, buttonClass } from "./ui";
 
 const KINDS: ChecklistKind[] = ["pre", "post", "refuel"];
 
-function Mover({ label, first, last, onMove, onDelete }: { label: string; first: boolean; last: boolean; onMove: (d: -1 | 1) => void; onDelete: () => void }) {
+function Mover({ label, first, last, onMove, onDelete }: { label: string; first: boolean; last: boolean; onMove: (d: -1 | 1) => void; onDelete: () => void | Promise<void> }) {
   return (
     <div className="flex shrink-0">
       <button type="button" aria-label={`Move ${label} up`} disabled={first} onClick={() => onMove(-1)} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-ink disabled:opacity-30">
@@ -18,9 +19,9 @@ function Mover({ label, first, last, onMove, onDelete }: { label: string; first:
       <button type="button" aria-label={`Move ${label} down`} disabled={last} onClick={() => onMove(1)} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-ink disabled:opacity-30">
         <IconDown width={18} height={18} />
       </button>
-      <button type="button" aria-label={`Delete ${label}`} onClick={onDelete} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-loss">
+      <ConfirmDelete label={`Delete ${label}`} onConfirm={onDelete} className="min-h-11 min-w-9">
         <IconTrash width={18} height={18} />
-      </button>
+      </ConfirmDelete>
     </div>
   );
 }
@@ -155,7 +156,6 @@ export function NotesEditor({ notes, checklist, preview = false }: { notes: Note
                 onMove={(d) => start(async () => void (await reorder("lift_notes", swap(i, d).map((x) => x.id))))}
                 onDelete={() =>
                   start(async () => {
-                    if (!confirm(`Delete the ${n.title} section?`)) return;
                     const res = await deleteNote(n.id);
                     if (res.ok) setOrder((o) => o.filter((x) => x.id !== n.id));
                   })

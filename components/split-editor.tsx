@@ -7,9 +7,10 @@ import type { Exercise, Units, WorkoutDay } from "@/lib/types";
 import { exerciseLabel } from "@/lib/types";
 import { fmtWeight, fromUnit, toUnit } from "@/lib/units";
 import { IconChevronDown, IconDown, IconTrash, IconUp, IconX } from "./icons";
+import { ConfirmDelete } from "./confirm-delete";
 import { NumField } from "./num-field";
 import { SaveBadge, useAutosave } from "./use-autosave";
-import { Button, Card, Empty, Input, PageHeader, Select, Textarea, cx } from "./ui";
+import { Button, Card, Empty, Input, PageHeader, Textarea, cx } from "./ui";
 
 type Tab = "days" | "list";
 
@@ -32,10 +33,13 @@ function DayCard({ day, index, total, exercises, units, onMove, onDeleted, previ
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(day.name);
   const [ids, setIds] = useState(day.exerciseIds);
+  const router = useRouter();
   const [pick, setPick] = useState("");
+  const [editing, setEditing] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [pending, start] = useTransition();
   const byId = new Map(exercises.map((e) => [e.id, e]));
+  const byName = new Map(exercises.map((e) => [e.name.trim().toLowerCase(), e.id]));
   const nameSave = useAutosave({ id: day.id, name: name.trim() || day.name }, saveDay, { enabled: !preview });
   useEffect(() => setIds(day.exerciseIds), [day.exerciseIds]);
 
@@ -45,7 +49,31 @@ function DayCard({ day, index, total, exercises, units, onMove, onDeleted, previ
       start(async () => {
         const res = await setDayExercises(day.id, next);
         setErr(res.ok ? "" : res.error);
+        // Something taken off its last day leaves the exercise list, so reload it.
+        if (res.ok) router.refresh();
       });
+  };
+  const add = () => {
+    const name = pick.trim();
+    if (!name) return;
+    const existing = byName.get(name.toLowerCase());
+    if (existing) {
+      commit([...ids, existing]);
+      setPick("");
+      return;
+    }
+    start(async () => {
+      setErr("");
+      const res = await saveExercise({ muscle: "", name, equipment: "", sets: 1, reps: "4-8", weight_lb: null, note: "", alternative: "" });
+      if (!res.ok || !res.id) return setErr(res.ok ? "Couldn't add it." : res.error);
+      const next = [...ids, res.id];
+      setIds(next);
+      setEditing(next.length - 1);
+      setPick("");
+      const r2 = await setDayExercises(day.id, next);
+      if (!r2.ok) return setErr(r2.error);
+      router.refresh();
+    });
   };
   const swap = (i: number, d: -1 | 1) => {
     const next = [...ids];
@@ -54,7 +82,7 @@ function DayCard({ day, index, total, exercises, units, onMove, onDeleted, previ
   };
 
   return (
-    <li className="rounded-xl border border-line bg-bg">
+    <li className="min-w-0 rounded-xl border border-line bg-bg">
       <div className="flex items-center gap-1 p-2">
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-panel2 text-[13px] font-semibold tabular-nums text-muted">{index + 1}</span>
@@ -68,43 +96,49 @@ function DayCard({ day, index, total, exercises, units, onMove, onDeleted, previ
       </div>
 
       {open && (
-        <div className="grid gap-3 border-t border-line p-3">
+        <div className="grid min-w-0 gap-3 border-t border-line p-3">
           <div className="flex items-center gap-2">
             <Input aria-label="Day name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="font-semibold" />
-            <button
-              type="button"
-              aria-label={`Delete ${day.name}`}
-              onClick={() =>
-                start(async () => {
-                  if (!confirm(`Delete ${day.name} from the rotation? Past workouts keep it.`)) return;
-                  const res = await deleteDay(day.id);
-                  if (!res.ok) return setErr(res.error);
-                  onDeleted();
-                })
-              }
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted hover:text-loss"
+            <ConfirmDelete
+              label={`Delete ${day.name}`}
+              className="min-h-11 min-w-11"
+              onConfirm={async () => {
+                const res = await deleteDay(day.id);
+                if (!res.ok) return setErr(res.error);
+                onDeleted();
+              }}
             >
               <IconTrash width={18} height={18} />
-            </button>
+            </ConfirmDelete>
           </div>
           {nameSave.state !== "idle" && <SaveBadge state={nameSave.state} error={nameSave.error} />}
 
           {ids.length ? (
-            <ol className="grid gap-1.5">
+            <ol className="grid min-w-0 gap-1.5">
               {ids.map((id, i) => {
                 const e = byId.get(id);
                 if (!e) return null;
                 return (
-                  <li key={`${id}-${i}`} className="flex items-center gap-1 rounded-lg border border-line bg-panel px-3 py-1">
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[11px] uppercase tracking-wide text-muted">{e.muscle}</span>
-                      <span className="block truncate text-[15px]">{e.name}</span>
-                    </span>
-                    <span className="shrink-0 pr-1 text-[13px] tabular-nums text-muted">{fmtWeight(e.weight_lb, units)}</span>
-                    <Arrows label={e.name} first={i === 0} last={i === ids.length - 1} onMove={(d) => swap(i, d)} />
-                    <button type="button" aria-label={`Remove ${e.name} from ${day.name}`} onClick={() => commit(ids.filter((_, j) => j !== i))} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-loss">
-                      <IconX width={18} height={18} />
-                    </button>
+                  <li key={`${id}-${i}`} className="min-w-0 rounded-lg border border-line bg-panel">
+                    <div className="flex items-center gap-1 py-1 pl-3 pr-1">
+                      <button type="button" onClick={() => setEditing(editing === i ? null : i)} aria-expanded={editing === i} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left">
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[11px] uppercase tracking-wide text-muted">{e.muscle}</span>
+                          <span className="block truncate text-[15px]">{e.name}</span>
+                        </span>
+                        <span className="shrink-0 pr-1 text-[13px] tabular-nums text-muted">{fmtWeight(e.weight_lb, units)}</span>
+                        <IconChevronDown className={cx("shrink-0 text-muted transition", editing === i && "rotate-180")} />
+                      </button>
+                      <Arrows label={e.name} first={i === 0} last={i === ids.length - 1} onMove={(d) => { setEditing(null); swap(i, d); }} />
+                      <button type="button" aria-label={`Remove ${e.name} from ${day.name}`} onClick={() => { setEditing(null); commit(ids.filter((_, j) => j !== i)); }} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-loss">
+                        <IconX width={18} height={18} />
+                      </button>
+                    </div>
+                    {editing === i && (
+                      <div className="border-t border-line p-3">
+                        <ExerciseFields ex={e} units={units} preview={preview} />
+                      </div>
+                    )}
                   </li>
                 );
               })}
@@ -113,26 +147,25 @@ function DayCard({ day, index, total, exercises, units, onMove, onDeleted, previ
             <Empty title="No exercises on this day yet" />
           )}
 
-          <div className="flex gap-2">
-            <Select aria-label={`Add an exercise to ${day.name}`} value={pick} onChange={(e) => setPick(e.target.value)}>
-              <option value="">Add from your exercise list…</option>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              add();
+            }}
+          >
+            <Input aria-label={`Add an exercise to ${day.name}`} list={`ex-${day.id}`} value={pick} onChange={(e) => setPick(e.target.value)} maxLength={120} placeholder="Add an exercise (new or from your list)" />
+            <datalist id={`ex-${day.id}`}>
               {exercises.map((e) => (
-                <option key={e.id} value={e.id}>
+                <option key={e.id} value={e.name}>
                   {exerciseLabel(e)}
                 </option>
               ))}
-            </Select>
-            <Button
-              variant="subtle"
-              disabled={!pick || pending || preview}
-              onClick={() => {
-                commit([...ids, pick]);
-                setPick("");
-              }}
-            >
+            </datalist>
+            <Button type="submit" variant="subtle" disabled={!pick.trim() || pending || preview}>
               Add
             </Button>
-          </div>
+          </form>
           {err && <p className="text-[13px] text-loss">{err}</p>}
         </div>
       )}
@@ -262,69 +295,75 @@ function ImportCard({ units, startOpen, preview }: { units: Units; startOpen: bo
 
 // ---------- exercise list ----------
 
-function ExerciseRow({ ex, units, onDelete, preview }: { ex: Exercise; units: Units; onDelete: () => void; preview: boolean }) {
-  const [open, setOpen] = useState(false);
+/** Every detail of one exercise, saving on its own. Used in a day and in the exercise list. */
+function ExerciseFields({ ex, units, onDelete, deleteLabel, preview }: { ex: Exercise; units: Units; onDelete?: () => Promise<void>; deleteLabel?: string; preview: boolean }) {
   const [v, setV] = useState({ muscle: ex.muscle, name: ex.name, equipment: ex.equipment, sets: ex.sets, reps: ex.reps, weight_lb: ex.weight_lb, note: ex.note, alternative: ex.alternative });
   const save = useAutosave({ id: ex.id, ...v, name: v.name.trim() || ex.name }, saveExercise, { enabled: !preview });
   return (
-    <li className="rounded-xl border border-line bg-bg">
-      <div className="flex items-center gap-2 p-2">
-        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left">
-          <span className="min-w-0 flex-1">
-            <span className="block text-[11px] uppercase tracking-wide text-muted">{v.muscle || "No muscle"}</span>
-            <span className="block truncate font-semibold">{v.name}</span>
-          </span>
-          <IconChevronDown className={cx("shrink-0 text-muted transition", open && "rotate-180")} />
-        </button>
-        <div className="w-24 shrink-0">
-          <NumField label={`${v.name} weight in ${units}`} value={toUnit(v.weight_lb, units)} onChange={(n) => setV({ ...v, weight_lb: fromUnit(n, units) })} placeholder={units} />
-        </div>
+    <div className="grid min-w-0 gap-2">
+      <label className="grid min-w-0 gap-1 text-[12px] text-muted">
+        Exercise
+        <Input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} maxLength={120} />
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="grid min-w-0 gap-1 text-[12px] text-muted">
+          Muscle
+          <Input value={v.muscle} onChange={(e) => setV({ ...v, muscle: e.target.value })} maxLength={60} placeholder="e.g. Back" />
+        </label>
+        <label className="grid min-w-0 gap-1 text-[12px] text-muted">
+          Equipment
+          <Input value={v.equipment} onChange={(e) => setV({ ...v, equipment: e.target.value })} maxLength={120} placeholder="e.g. strap, belt" />
+        </label>
       </div>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="grid min-w-0 gap-1 text-[12px] text-muted">
+          Weight ({units})
+          <NumField label={`${v.name} weight in ${units}`} value={toUnit(v.weight_lb, units)} onChange={(n) => setV({ ...v, weight_lb: fromUnit(n, units) })} placeholder="0" />
+        </label>
+        <label className="grid min-w-0 gap-1 text-[12px] text-muted">
+          Rep range
+          <Input value={v.reps} onChange={(e) => setV({ ...v, reps: e.target.value })} maxLength={20} placeholder="4-8" className="text-center" />
+        </label>
+        <label className="grid min-w-0 gap-1 text-[12px] text-muted">
+          Sets
+          <NumField label="Working sets" decimals={false} value={v.sets} onChange={(n) => setV({ ...v, sets: Math.min(20, Math.max(1, n ?? 1)) })} />
+        </label>
+      </div>
+      <label className="grid min-w-0 gap-1 text-[12px] text-muted">
+        Notes
+        <Textarea value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} maxLength={500} className="min-h-16" placeholder="Form cues, setup" />
+      </label>
+      <label className="grid min-w-0 gap-1 text-[12px] text-muted">
+        Alternative
+        <Input value={v.alternative} onChange={(e) => setV({ ...v, alternative: e.target.value })} maxLength={200} placeholder="If the machine is taken" />
+      </label>
+      <div className="flex items-center justify-between gap-2">
+        {save.state !== "idle" ? <SaveBadge state={save.state} error={save.error} /> : <span className="text-[12px] text-muted">Saves on its own. Updates every day that uses it.</span>}
+        {onDelete && !preview && (
+          <ConfirmDelete label={deleteLabel ?? "Delete"} onConfirm={onDelete} className="min-h-11 border border-loss/40 px-3">
+            {deleteLabel ?? "Delete"}
+          </ConfirmDelete>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExerciseRow({ ex, units, onDelete, preview }: { ex: Exercise; units: Units; onDelete: () => Promise<void>; preview: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="rounded-xl border border-line bg-bg">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-14 w-full items-center gap-2 rounded-xl px-4 text-left">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] uppercase tracking-wide text-muted">{ex.muscle || "No muscle"}</span>
+          <span className="block truncate font-semibold">{ex.name}</span>
+        </span>
+        <span className="shrink-0 text-[13px] tabular-nums text-muted">{fmtWeight(ex.weight_lb, units)}</span>
+        <IconChevronDown className={cx("shrink-0 text-muted transition", open && "rotate-180")} />
+      </button>
       {open && (
-        <div className="grid gap-2 border-t border-line p-3">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="grid gap-1 text-[12px] text-muted">
-              Muscle
-              <Input value={v.muscle} onChange={(e) => setV({ ...v, muscle: e.target.value })} maxLength={60} placeholder="e.g. Back" />
-            </label>
-            <label className="grid gap-1 text-[12px] text-muted">
-              Equipment
-              <Input value={v.equipment} onChange={(e) => setV({ ...v, equipment: e.target.value })} maxLength={120} placeholder="e.g. strap, belt" />
-            </label>
-          </div>
-          <label className="grid gap-1 text-[12px] text-muted">
-            Exercise
-            <Input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} maxLength={120} />
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="grid gap-1 text-[12px] text-muted">
-              Rep range
-              <Input value={v.reps} onChange={(e) => setV({ ...v, reps: e.target.value })} maxLength={20} placeholder="4-8" className="text-center" />
-            </label>
-            <label className="grid gap-1 text-[12px] text-muted">
-              Working sets
-              <NumField label="Working sets" decimals={false} value={v.sets} onChange={(n) => setV({ ...v, sets: Math.min(20, Math.max(1, n ?? 1)) })} />
-            </label>
-          </div>
-          <label className="grid gap-1 text-[12px] text-muted">
-            Notes
-            <Textarea value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} maxLength={500} className="min-h-16" placeholder="Form cues, setup" />
-          </label>
-          <label className="grid gap-1 text-[12px] text-muted">
-            Alternative
-            <Input value={v.alternative} onChange={(e) => setV({ ...v, alternative: e.target.value })} maxLength={200} placeholder="If the machine is taken" />
-          </label>
-          <div className="flex items-center justify-between gap-2">
-            {save.state !== "idle" ? <SaveBadge state={save.state} error={save.error} /> : <span />}
-            <Button variant="danger" onClick={onDelete} disabled={preview}>
-              Delete exercise
-            </Button>
-          </div>
-        </div>
-      )}
-      {!open && save.state !== "idle" && save.state !== "saved" && (
-        <div className="px-4 pb-2">
-          <SaveBadge state={save.state} error={save.error} />
+        <div className="border-t border-line p-3">
+          <ExerciseFields ex={ex} units={units} preview={preview} onDelete={onDelete} deleteLabel="Delete from every day" />
         </div>
       )}
     </li>
@@ -334,12 +373,10 @@ function ExerciseRow({ ex, units, onDelete, preview }: { ex: Exercise; units: Un
 function ExerciseList({ exercises, units, preview }: { exercises: Exercise[]; units: Units; preview: boolean }) {
   const router = useRouter();
   const [list, setList] = useState(exercises);
-  const [name, setName] = useState("");
   const [err, setErr] = useState("");
-  const [pending, start] = useTransition();
   useEffect(() => setList(exercises), [exercises]);
   return (
-    <Card title="Exercise list" action={<span className="text-[13px] text-muted">Weight ({units}) carries to every day</span>}>
+    <Card title="Exercise list" action={<span className="text-[13px] text-muted">Every exercise in your split</span>}>
       {list.length ? (
         <ul className="grid gap-2">
           {list.map((e) => (
@@ -348,40 +385,19 @@ function ExerciseList({ exercises, units, preview }: { exercises: Exercise[]; un
               ex={e}
               units={units}
               preview={preview}
-              onDelete={() =>
-                start(async () => {
-                  if (!confirm(`Delete ${e.name}? It comes off every day. Past workouts keep it.`)) return;
-                  const res = await deleteExercise(e.id);
-                  if (!res.ok) return setErr(res.error);
-                  setList((l) => l.filter((x) => x.id !== e.id));
-                  router.refresh();
-                })
-              }
+              onDelete={async () => {
+                const res = await deleteExercise(e.id);
+                if (!res.ok) return setErr(res.error);
+                setList((l) => l.filter((x) => x.id !== e.id));
+                router.refresh();
+              }}
             />
           ))}
         </ul>
       ) : (
-        <Empty title="No exercises yet" />
+        <Empty title="No exercises yet">Add them to a day on the Days tab.</Empty>
       )}
-      <form
-        className="mt-3 flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!name.trim()) return;
-          start(async () => {
-            setErr("");
-            const res = await saveExercise({ muscle: "", name: name.trim(), equipment: "", sets: 1, reps: "4-8", weight_lb: null, note: "", alternative: "" });
-            if (!res.ok) return setErr(res.error);
-            setName("");
-            router.refresh();
-          });
-        }}
-      >
-        <Input aria-label="New exercise" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="New exercise" />
-        <Button type="submit" variant="subtle" disabled={pending || !name.trim() || preview}>
-          Add
-        </Button>
-      </form>
+      <p className="mt-3 text-[13px] text-muted">To add an exercise, add it to a day. An exercise that&apos;s on no day is removed.</p>
       {err && <p className="mt-2 text-[13px] text-loss">{err}</p>}
     </Card>
   );

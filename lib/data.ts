@@ -100,6 +100,14 @@ export async function getExercises(ctx: AppContext): Promise<Exercise[]> {
   return (data ?? []).map(normalizeExercise);
 }
 
+/** Removes exercises that are on no day (leftovers from before this rule). */
+export async function removeUnusedExercises(ctx: AppContext, days: WorkoutDay[], exercises: Exercise[]): Promise<Exercise[]> {
+  const used = new Set(days.flatMap((d) => d.exerciseIds));
+  const gone = exercises.filter((e) => !used.has(e.id)).map((e) => e.id);
+  if (gone.length) await ctx.supabase.from("lift_exercises").delete().in("id", gone);
+  return exercises.filter((e) => used.has(e.id));
+}
+
 /** Workout days in rotation order, each with its exercise ids in order. */
 export async function getDays(ctx: AppContext): Promise<WorkoutDay[]> {
   const [{ data: days }, { data: items }] = await Promise.all([

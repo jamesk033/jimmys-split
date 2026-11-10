@@ -23,6 +23,8 @@ Lifting log (PWA) built by ICT_Jimmy (GitHub jamesk033). Sister site of Jimmy's 
 ## Rules baked into the code
 - The split is a rotation of named days (`lift_days`, owner's: A Upper 1, A Lower 1, A Upper 2, A Lower 2, B Upper 1, B Lower 1, B Upper 2, B Lower 2). Next day = the one after the last finished workout, wrapping around (lib/lift.ts `nextDay`). "Log rest day" saves a rest row that doesn't move the rotation. Any past day with nothing logged (from the first log, last 90 days) is saved as a rest day on the next page load (`backfillRestDays` in lib/data.ts); one rest row per date (0004).
 - Exercise list (`lift_exercises`): muscle, name, equipment, sets (1 working set), rep range, weight, notes, alternative. Days point at exercises (`lift_day_exercises`), so weight carries across every day using it.
+- Exercises are added through a day (type a new name or pick one from the list) and edited right in the day (tap a row). An exercise on no day is deleted (`pruneUnused` after day edits, `removeUnusedExercises` on the Split page) and drops off Home's progress and best lifts. Past workouts keep their sets.
+- Every delete uses `ConfirmDelete` (components/confirm-delete.tsx, same as Jimmy's Journal): tap once to arm, again to delete. No browser confirm popups.
 - Rep ranges: 4-8 default, 4-6 hack squat and RDL, 6-10 forearms. Beat the top of the range (9, 7, 11) and the workout shows "Go up next time" (`shouldGoUp`).
 - Weights stored in pounds (`*_lb` columns), shown in the user's unit (lib/units.ts). Units are picked right after sign-up (layout gate) and in Settings.
 - One workout in progress at a time (unique index).

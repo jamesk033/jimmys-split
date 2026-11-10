@@ -8,6 +8,7 @@ import { longDate } from "@/lib/time";
 import { type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight, fromUnit, stepFor, toUnit } from "@/lib/units";
 import { IconCheck, IconPlus, IconTrophy, IconX } from "./icons";
+import { ConfirmDelete } from "./confirm-delete";
 import { NumField } from "./num-field";
 import { SaveBadge, useAutosave } from "./use-autosave";
 import { Badge, Button, Card, Empty, Input, Label, PageHeader, Progress, Textarea, buttonClass, cx } from "./ui";
@@ -80,9 +81,11 @@ function EditPanel({ g, ex, onSaved, onRename, onSwap, onRemove, onClose, previe
             Swap to alternative today
           </Button>
         )}
-        <Button variant="danger" onClick={onRemove} disabled={preview}>
-          Remove from this workout
-        </Button>
+        {!preview && (
+          <ConfirmDelete label="Remove from this workout" confirmText="Remove?" onConfirm={onRemove} className="min-h-11 border border-loss/40 px-3">
+            Remove from this workout
+          </ConfirmDelete>
+        )}
         <button type="button" onClick={onClose} className="min-h-11 px-2 text-[14px] text-muted">
           Cancel
         </button>
@@ -228,14 +231,12 @@ export function WorkoutEditor({
       router.refresh();
     });
 
-  const remove = () =>
-    start(async () => {
-      if (!confirm("Delete this workout? This can't be undone.")) return;
-      const res = await deleteWorkout(session.id);
-      if (!res.ok) return setMsg(res.error);
-      router.push("/history");
-      router.refresh();
-    });
+  const remove = async () => {
+    const res = await deleteWorkout(session.id);
+    if (!res.ok) return setMsg(res.error);
+    router.push("/history");
+    router.refresh();
+  };
 
   const TABS: [Tab, string, string][] = [
     ["pre", "Pre-lift", `${count(preItems, pre)}/${preItems.length}`],
@@ -346,7 +347,6 @@ export function WorkoutEditor({
                       setEditing(null);
                     }}
                     onRemove={() => {
-                      if (!confirm(`Remove ${g.name} from this workout?`)) return;
                       setSets((all) => all.filter((s) => !inGroup(g, s)));
                       setEditing(null);
                     }}
@@ -476,9 +476,11 @@ export function WorkoutEditor({
           <Link href="/history" className={buttonClass("ghost")}>
             All workouts
           </Link>
-          <Button variant="danger" onClick={remove} disabled={pending || preview}>
-            Delete workout
-          </Button>
+          {!preview && (
+            <ConfirmDelete label="Delete workout" onConfirm={remove} className="min-h-11 border border-loss/40 px-4">
+              Delete workout
+            </ConfirmDelete>
+          )}
         </div>
       )}
     </div>
