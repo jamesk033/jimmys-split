@@ -36,11 +36,19 @@ export function parseExerciseLine(line: string): ImportedExercise | null {
   if (parts.length === 1) name = parts[0];
   else if (parts.length === 2) [muscle, name] = parts;
   else [muscle, name, equipment] = [parts[0], parts[1], parts.slice(2).join(", ")];
+  // "_" stands for "no muscle" when there is equipment.
+  if (muscle === "_") muscle = "";
   let weight: number | null = null;
   let reps: string | null = null;
-  for (const x of extra) {
-    if (/^\d+(\.\d+)?\s*(lbs?|kg)?s?$/i.test(x) && weight === null) weight = parseFloat(x);
-    else if (/^\d+\s*-\s*\d+$|^\d+$/.test(x) && reps === null) reps = x.replace(/\s/g, "");
+  const num = (x: string) => (/^\d+(\.\d+)?\s*(lbs?|kg)?s?$/i.test(x) ? parseFloat(x) : null);
+  const range = (x: string) => (/^\d+\s*-\s*\d+$|^\d+$/.test(x) ? x.replace(/\s/g, "") : null);
+  if (extra.length >= 2) {
+    // "| weight | reps", where "-" means no weight.
+    weight = extra[0] === "-" ? null : num(extra[0]);
+    reps = range(extra[1]);
+  } else if (extra.length === 1) {
+    if (/\d\s*-\s*\d/.test(extra[0])) reps = range(extra[0]);
+    else weight = num(extra[0]);
   }
   if (!name) return null;
   return { muscle: cap(muscle).slice(0, 60), name: cap(name).slice(0, 120), equipment: equipment.slice(0, 120), weight, reps };
@@ -62,4 +70,25 @@ export function parseSplit(text: string): ImportedDay[] {
     if (name) days.push({ name, exercises });
   }
   return days;
+}
+
+/** The whole split as text in the same format, so it can be edited in one box. Weights in the lifter's unit. */
+export function splitToText(days: { name: string; exerciseIds: string[] }[], exercises: { id: string; muscle: string; name: string; equipment: string; weight: number | null; reps: string }[]): string {
+  const byId = new Map(exercises.map((e) => [e.id, e]));
+  return days
+    .map((d) =>
+      [
+        d.name,
+        ...d.exerciseIds
+          .map((id) => byId.get(id))
+          .filter((e): e is NonNullable<typeof e> => !!e)
+          .map((e) => {
+            const main = [e.muscle, e.name, e.equipment].filter(Boolean).join(" - ");
+            const w = e.weight === null ? "-" : String(e.weight);
+            const line = e.muscle ? main : e.equipment ? `_ - ${e.name} - ${e.equipment}` : e.name;
+            return `${line} | ${w} | ${e.reps || "4-8"}`;
+          }),
+      ].join("\n"),
+    )
+    .join("\n\n");
 }

@@ -18,3 +18,24 @@ describe("paste-in split", () => {
     expect(days[0].exercises.map((e) => e.name)).toEqual(["Pulldown", "Curl"]);
   });
 });
+
+describe("edit split as text", () => {
+  it("turns the split into text and back without losing anything", async () => {
+    const { splitToText } = await import("@/lib/import");
+    const ex = [
+      { id: "a", muscle: "Back", name: "Wide-grip lat pulldown", equipment: "strap", weight: 260, reps: "4-8" },
+      { id: "b", muscle: "", name: "Dragon flags", equipment: "", weight: null, reps: "4-8" },
+      { id: "c", muscle: "", name: "Farmer carry", equipment: "straps", weight: 100, reps: "5" },
+      { id: "d", muscle: "Erector", name: "RDL", equipment: "strap, belt", weight: 415, reps: "4-6" },
+    ];
+    const text = splitToText([{ name: "A Upper 1", exerciseIds: ["a", "b", "c"] }, { name: "B Lower 1", exerciseIds: ["d"] }], ex);
+    const back = parseSplit(text);
+    expect(back.map((d) => d.name)).toEqual(["A Upper 1", "B Lower 1"]);
+    expect(back[0].exercises).toEqual([
+      { muscle: "Back", name: "Wide-grip lat pulldown", equipment: "strap", weight: 260, reps: "4-8" },
+      { muscle: "", name: "Dragon flags", equipment: "", weight: null, reps: "4-8" },
+      { muscle: "", name: "Farmer carry", equipment: "straps", weight: 100, reps: "5" },
+    ]);
+    expect(back[1].exercises[0]).toEqual({ muscle: "Erector", name: "RDL", equipment: "strap, belt", weight: 415, reps: "4-6" });
+  });
+});

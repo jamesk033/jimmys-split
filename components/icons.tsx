@@ -46,3 +46,4 @@ export const IconCheck = (p: P) => (<svg {...base} {...p}><path d="M5 12.5l4.5 4
 export const IconNotes = (p: P) => (<svg {...base} {...p}><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 12h7M9 16h7" /></svg>);
 export const IconSplit = (p: P) => (<svg {...base} {...p}><path d="M4 7h7l3 5-3 5H4" /><path d="M20 7h-3M20 17h-3" /></svg>);
 export const IconScale = (p: P) => (<svg {...base} {...p}><rect x="3.5" y="3.5" width="17" height="17" rx="4" /><path d="M8.5 9a5 5 0 0 1 7 0l-2.2 2.2" /></svg>);
+export const IconGrip = (p: P) => (<svg {...base} {...p}><circle cx="9" cy="6" r="1.2" /><circle cx="15" cy="6" r="1.2" /><circle cx="9" cy="12" r="1.2" /><circle cx="15" cy="12" r="1.2" /><circle cx="9" cy="18" r="1.2" /><circle cx="15" cy="18" r="1.2" /></svg>);

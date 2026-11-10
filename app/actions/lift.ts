@@ -147,6 +147,56 @@ export async function importSplit(text: string): Promise<ActionResult & { days?:
   return { ok: true, days: days.length, exercises: created };
 }
 
+/**
+ * "Edit as text": the text becomes the whole split. Days are rebuilt in the order written.
+ * Exercises are matched by name, so their notes, alternatives and history stay; new names are added;
+ * exercises left on no day are removed. Weight and rep range come from the text.
+ */
+export async function replaceSplit(text: string): Promise<ActionResult> {
+  if (typeof text !== "string" || text.length > 30000) return { ok: false, error: "That's too long." };
+  const days = parseSplit(text);
+  if (days.length > 40) return { ok: false, error: "Up to 40 days." };
+  const ctx = await getContext();
+  if (ctx.guest) return { ok: false, error: "Make a free account to edit a split." };
+  const units = ctx.settings.units ?? "lb";
+  const existing = await getExercises(ctx);
+  const byName = new Map(existing.map((e) => [e.name.trim().toLowerCase(), e]));
+  const ids = new Map<string, string>();
+  let nextPos = Math.max(-1, ...existing.map((e) => e.position)) + 1;
+  for (const d of days)
+    for (const x of d.exercises) {
+      const key = x.name.toLowerCase();
+      if (ids.has(key)) continue;
+      const row = { muscle: x.muscle, name: x.name, equipment: x.equipment, weight_lb: x.weight === null ? null : fromUnit(x.weight, units), reps: x.reps ?? "4-8" };
+      const found = byName.get(key);
+      if (found) {
+        const { error } = await ctx.supabase.from("lift_exercises").update(row).eq("id", found.id);
+        if (error) return fail(error);
+        ids.set(key, found.id);
+      } else {
+        const id = randomUUID();
+        const { error } = await ctx.supabase.from("lift_exercises").insert({ id, user_id: ctx.userId, sets: 1, ...row, position: nextPos++ });
+        if (error) return fail(error);
+        ids.set(key, id);
+      }
+    }
+  const { error: delErr } = await ctx.supabase.from("lift_days").delete().eq("user_id", ctx.userId);
+  if (delErr) return fail(delErr);
+  for (let i = 0; i < days.length; i++) {
+    const dayId = randomUUID();
+    const { error } = await ctx.supabase.from("lift_days").insert({ id: dayId, user_id: ctx.userId, name: days[i].name, position: i });
+    if (error) return fail(error);
+    const order = [...new Set(days[i].exercises.map((x) => ids.get(x.name.toLowerCase())!))];
+    if (order.length) {
+      const { error: e2 } = await ctx.supabase.from("lift_day_exercises").insert(order.map((exercise_id, position) => ({ user_id: ctx.userId, day_id: dayId, exercise_id, position })));
+      if (e2) return fail(e2);
+    }
+  }
+  await pruneUnused(ctx);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 // ---------- exercise list ----------
 
 const exerciseSchema = z.object({
