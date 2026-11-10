@@ -8,7 +8,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { addToDay, deleteDay, deleteExercise, importSplit, reorder, replaceSplit, saveDay, saveExercise, setDayExercises } from "@/app/actions/lift";
 import { parseSplit, splitToText } from "@/lib/import";
 import type { Exercise, Units, WorkoutDay } from "@/lib/types";
-import { exerciseLabel } from "@/lib/types";
+import { exerciseLabel, shortDay } from "@/lib/types";
 import { fmtWeight, fromUnit, toUnit } from "@/lib/units";
 import { IconChevronDown, IconGrip, IconTrash, IconX } from "./icons";
 import { ConfirmDelete } from "./confirm-delete";
@@ -441,14 +441,15 @@ function ExerciseFields({ ex, units, onDelete, deleteLabel, preview }: { ex: Exe
   );
 }
 
-function ExerciseRow({ ex, units, onDelete, preview }: { ex: Exercise; units: Units; onDelete: () => Promise<void>; preview: boolean }) {
+function ExerciseRow({ ex, units, onDelete, preview, dayNames = [] }: { ex: Exercise; units: Units; onDelete: () => Promise<void>; preview: boolean; dayNames?: string[] }) {
   const [open, setOpen] = useState(false);
   return (
-    <li className="rounded-xl border border-line bg-bg">
+    <li className="min-w-0 rounded-xl border border-line bg-bg">
       <button data-guest-ok type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-14 w-full items-center gap-2 rounded-xl px-4 text-left">
         <span className="min-w-0 flex-1">
           <span className="block text-[11px] uppercase tracking-wide text-muted">{ex.muscle || "No muscle"}</span>
           <span className="block truncate font-semibold">{ex.name}</span>
+          {dayNames.length > 0 && <span className="block truncate text-[12px] text-muted">On {dayNames.join(", ")}</span>}
         </span>
         <span className="shrink-0 text-[13px] tabular-nums text-muted">{fmtWeight(ex.weight_lb, units)}</span>
         <IconChevronDown className={cx("shrink-0 text-muted transition", open && "rotate-180")} />
@@ -462,36 +463,107 @@ function ExerciseRow({ ex, units, onDelete, preview }: { ex: Exercise; units: Un
   );
 }
 
-function ExerciseList({ exercises, units, preview }: { exercises: Exercise[]; units: Units; preview: boolean }) {
+function ExerciseList({ exercises, days, units, preview }: { exercises: Exercise[]; days: WorkoutDay[]; units: Units; preview: boolean }) {
   const router = useRouter();
   const [list, setList] = useState(exercises);
   const [err, setErr] = useState("");
+  const [name, setName] = useState("");
+  const [onDays, setOnDays] = useState<string[]>([]);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
   useEffect(() => setList(exercises), [exercises]);
+  const daysOf = (id: string) => days.filter((d) => d.exerciseIds.includes(id));
+
   return (
-    <Card title="Exercise list" action={<span className="text-[13px] text-muted">Every exercise in your split</span>}>
-      {list.length ? (
-        <ul className="grid gap-2">
-          {list.map((e) => (
-            <ExerciseRow
-              key={e.id}
-              ex={e}
-              units={units}
-              preview={preview}
-              onDelete={async () => {
-                const res = await deleteExercise(e.id);
-                if (!res.ok) return setErr(res.error);
-                setList((l) => l.filter((x) => x.id !== e.id));
+    <div className="grid gap-4">
+      <Card title="Add an exercise">
+        {days.length ? (
+          <form
+            className="grid gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const n = name.trim();
+              if (!n || !onDays.length) return;
+              start(async () => {
+                setMsg(null);
+                // Put it on each picked day; the first one creates it, the rest reuse it.
+                for (const dayId of days.filter((d) => onDays.includes(d.id)).map((d) => d.id)) {
+                  const res = await addToDay(dayId, n);
+                  if (!res.ok) return setMsg({ ok: false, text: res.error });
+                }
+                setMsg({ ok: true, text: `Added ${n} to ${onDays.length} ${onDays.length === 1 ? "day" : "days"}. Tap it below to fill in the details.` });
+                setName("");
+                setOnDays([]);
                 router.refresh();
-              }}
-            />
-          ))}
-        </ul>
-      ) : (
-        <Empty title="No exercises yet">Add them to a day on the Days tab.</Empty>
-      )}
-      <p className="mt-3 text-[13px] text-muted">To add an exercise, add it to a day. An exercise that&apos;s on no day is removed.</p>
-      {err && <p className="mt-2 text-[13px] text-loss">{err}</p>}
-    </Card>
+              });
+            }}
+          >
+            <Input aria-label="Exercise name" list="ex-all" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="Exercise name, e.g. Face pulls" />
+            <datalist id="ex-all">
+              {exercises.map((e) => (
+                <option key={e.id} value={e.name}>
+                  {exerciseLabel(e)}
+                </option>
+              ))}
+            </datalist>
+            <div>
+              <p className="mb-1.5 text-[13px] text-muted">Put it on these days</p>
+              <div className="flex flex-wrap gap-1.5">
+                {days.map((d) => {
+                  const on = onDays.includes(d.id);
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setOnDays((x) => (on ? x.filter((y) => y !== d.id) : [...x, d.id]))}
+                      className={cx("min-h-10 rounded-lg border px-3 text-[14px]", on ? "border-accent bg-accent/15 font-semibold text-ink" : "border-line bg-bg text-muted hover:text-ink")}
+                    >
+                      {d.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" disabled={pending || preview || !name.trim() || !onDays.length}>
+                {pending ? "Adding…" : "Add exercise"}
+              </Button>
+              {!onDays.length && name.trim() && <span className="text-[13px] text-muted">Pick at least one day.</span>}
+              {msg && <span className={cx("text-[13px]", msg.ok ? "text-win" : "text-loss")}>{msg.text}</span>}
+            </div>
+          </form>
+        ) : (
+          <p className="text-[14px] text-muted">Add a day on the Days tab first.</p>
+        )}
+      </Card>
+
+      <Card title="Exercise list" action={<span className="text-[13px] text-muted">Every exercise in your split</span>}>
+        {list.length ? (
+          <ul className="grid min-w-0 gap-2">
+            {list.map((e) => (
+              <ExerciseRow
+                key={e.id}
+                ex={e}
+                units={units}
+                preview={preview}
+                dayNames={daysOf(e.id).map((d) => shortDay(d.name))}
+                onDelete={async () => {
+                  const res = await deleteExercise(e.id);
+                  if (!res.ok) return setErr(res.error);
+                  setList((l) => l.filter((x) => x.id !== e.id));
+                  router.refresh();
+                }}
+              />
+            ))}
+          </ul>
+        ) : (
+          <Empty title="No exercises yet">Add one above.</Empty>
+        )}
+        <p className="mt-3 text-[13px] text-muted">An exercise that&apos;s on no day is removed.</p>
+        {err && <p className="mt-2 text-[13px] text-loss">{err}</p>}
+      </Card>
+    </div>
   );
 }
 
@@ -519,7 +591,7 @@ export function SplitEditor({ days, exercises, units, preview = false }: { days:
           {!days.length && <ImportCard units={units} startOpen preview={preview} />}
         </>
       )}
-      {tab === "list" && <ExerciseList exercises={exercises} units={units} preview={preview} />}
+      {tab === "list" && <ExerciseList exercises={exercises} days={days} units={units} preview={preview} />}
       {tab === "text" && <TextEditor days={days} exercises={exercises} units={units} preview={preview} onDone={() => setTab("days")} />}
     </div>
   );
