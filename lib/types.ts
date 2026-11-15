@@ -76,6 +76,8 @@ export interface Session {
   notes: string;
   started_at: string;
   finished_at: string | null;
+  /** Set when the workout picture went to the Discord channel (0005). */
+  discord_posted_at?: string | null;
 }
 
 export interface SessionWithSets extends Session {

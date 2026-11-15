@@ -2,7 +2,7 @@
 import { drawMonthCard, drawWeekCard, drawWorkoutCard, loadImage, type MonthCardData, type WeekCardData, type WorkoutCardData } from "@/lib/share-cards";
 import { ShareActions } from "./share-actions";
 
-type Discord = { title: string; session?: string } | null;
+type Discord = { title: string; session?: string; posted?: boolean; auto?: boolean } | null;
 
 /** `photo` = the workout's first photo, drawn under the exercises. */
 export function WorkoutShare({ data, filename, discord, photo }: { data: WorkoutCardData; filename: string; discord: Discord; photo?: string | null }) {

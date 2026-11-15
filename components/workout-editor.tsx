@@ -551,7 +551,7 @@ export function WorkoutEditor({
             <WorkoutShare
               filename={`${(session.day_name || "workout").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${date}.png`}
               photo={photos[0]?.url ?? null}
-              discord={share.discord ? { title: `${session.day_name || "Workout"} · ${longDate(date)}`, session: session.id } : null}
+              discord={share.discord ? { title: `${session.day_name || "Workout"} · ${longDate(date)}`, session: session.id, posted: !!session.discord_posted_at, auto: justFinished && !preview } : null}
               data={{
                 dayName: session.day_name || "Workout",
                 dateLabel: longDate(date),
