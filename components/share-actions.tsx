@@ -11,7 +11,7 @@ export function ShareActions({
   label = "Share image",
   discord,
 }: {
-  make: () => HTMLCanvasElement;
+  make: () => HTMLCanvasElement | Promise<HTMLCanvasElement>;
   filename: string;
   label?: string;
   /** Shown only when the Discord channel is set up. */
@@ -30,10 +30,10 @@ export function ShareActions({
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="subtle" disabled={busy} onClick={run(() => shareCanvas(make(), filename))}>
+        <Button variant="subtle" disabled={busy} onClick={run(async () => shareCanvas(await make(), filename))}>
           {label}
         </Button>
-        <Button variant="ghost" disabled={busy} onClick={run(() => downloadCanvas(make(), filename))}>
+        <Button variant="ghost" disabled={busy} onClick={run(async () => downloadCanvas(await make(), filename))}>
           Download
         </Button>
         {discord && (
@@ -42,7 +42,7 @@ export function ShareActions({
             disabled={busy}
             onClick={run(async () => {
               setMsg(null);
-              const blob = await toBlob(make());
+              const blob = await toBlob(await make());
               if (!blob) return setMsg({ ok: false, text: "Couldn't make the image." });
               const form = new FormData();
               form.append("kind", discord.kind);

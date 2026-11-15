@@ -94,7 +94,17 @@ describe("lift schema", () => {
     await expect(as(B, `insert into lift_sessions (date, day_name, rest, status) values ('2026-11-02', 'Rest', true, 'done')`)).rejects.toThrow();
   });
 
-  it("rejects units other than lb or kg", async () => {
+  it("keeps workout photos private and in the owner's folder", async () => {
+    await db.exec(readFileSync(path.join(__dirname, "../supabase/migrations/0005_share_tabs.sql"), "utf8"));
+    await db.exec(readFileSync(path.join(__dirname, "../supabase/migrations/0006_workout_photos.sql"), "utf8"));
+    await as(A, `insert into lift_images (session_id, storage_path) values ('aaaaaaaa-0000-4000-8000-000000000001', '${A}/lift-aaaaaaaa-0000-4000-8000-000000000001/x.webp')`);
+    await expect(as(A, `insert into lift_images (session_id, storage_path) values ('aaaaaaaa-0000-4000-8000-000000000001', '${B}/lift-x/y.webp')`)).rejects.toThrow();
+    await expect(as(B, `insert into lift_images (session_id, storage_path) values ('aaaaaaaa-0000-4000-8000-000000000001', '${B}/lift-x/y.webp')`)).rejects.toThrow();
+    expect((await as(B, `select * from lift_images`)).rows).toHaveLength(0);
+    expect((await as(A, `select * from lift_images`)).rows).toHaveLength(1);
+  });
+
+    it("rejects units other than lb or kg", async () => {
     await as(B, `insert into lift_settings (units) values ('kg')`);
     await expect(as(B, `update lift_settings set units = 'stone'`)).rejects.toThrow();
   });

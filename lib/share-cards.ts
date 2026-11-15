@@ -89,10 +89,35 @@ export interface WorkoutCardData {
   handle: string;
 }
 
-export function drawWorkoutCard(d: WorkoutCardData): HTMLCanvasElement {
+/** Loads a photo for drawing (signed storage links allow this). Null if it can't be loaded. */
+export function loadImage(url: string | null | undefined): Promise<HTMLImageElement | null> {
+  if (!url) return Promise.resolve(null);
+  return new Promise((res) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => res(img);
+    img.onerror = () => res(null);
+    img.src = url;
+  });
+}
+
+/** The workout picture. With a photo, it sits under the exercises in its own shape (never cropped; tall ones capped and centered). */
+export function drawWorkoutCard(d: WorkoutCardData, photo?: HTMLImageElement | null): HTMLCanvasElement {
   const rowH = 82;
   const listTop = 420;
-  const h = Math.max(1350, listTop + d.exercises.length * rowH + 200);
+  const listEnd = listTop + d.exercises.length * rowH;
+  let pw = 0;
+  let ph = 0;
+  if (photo && photo.naturalWidth && photo.naturalHeight) {
+    pw = W - PAD * 2;
+    ph = Math.round((pw * photo.naturalHeight) / photo.naturalWidth);
+    if (ph > 1600) {
+      pw = Math.round((pw * 1600) / ph);
+      ph = 1600;
+    }
+  }
+  const photoTop = listEnd + 24;
+  const h = Math.max(1350, (ph ? photoTop + ph + 24 : listEnd) + 200);
   const { cv, ctx } = canvas(h);
   header(ctx, d.dateLabel, d.dayName);
   const sw = (W - PAD * 2 - 24) / 2;
@@ -123,6 +148,18 @@ export function drawWorkoutCard(d: WorkoutCardData): HTMLCanvasElement {
     }
     ctx.textAlign = "left";
     y += rowH;
+  }
+  if (photo && ph) {
+    const x = (W - pw) / 2;
+    ctx.save();
+    roundRect(ctx, x, photoTop, pw, ph, 24);
+    ctx.clip();
+    ctx.drawImage(photo, x, photoTop, pw, ph);
+    ctx.restore();
+    roundRect(ctx, x, photoTop, pw, ph, 24);
+    ctx.strokeStyle = C.line;
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
   brand(ctx, h, d.handle);
   return cv;

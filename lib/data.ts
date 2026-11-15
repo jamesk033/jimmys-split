@@ -9,7 +9,7 @@ import { DEFAULT_CHECKLIST, DEFAULT_DAYS, DEFAULT_EXERCISES, DEFAULT_NOTES } fro
 import { createClient, type ServerSupabase } from "./supabase/server";
 import { unloggedDays } from "./lift";
 import { DEFAULT_TZ, addDays, todayIn } from "./time";
-import { normalizeExercise, normalizeSession, normalizeSet, type ChecklistItem, type Exercise, type LiftSettings, type Note, type SessionWithSets, type WorkoutDay } from "./types";
+import { normalizeExercise, normalizeSession, normalizeSet, type ChecklistItem, type Exercise, type LiftSettings, type LiftImage, type Note, type SessionWithSets, type WorkoutDay } from "./types";
 
 export interface AppContext {
   supabase: ServerSupabase;
@@ -177,4 +177,15 @@ export async function getSessions(ctx: AppContext, opts: { from?: string; to?: s
   const by = new Map<string, typeof sets>();
   for (const s of sets) by.set(s.session_id, [...(by.get(s.session_id) ?? []), s]);
   return sessions.map((s) => ({ ...s, sets: by.get(s.id) ?? [] }));
+}
+
+/** A workout's photos, oldest first, with signed links good for an hour. */
+export async function getImages(ctx: AppContext, sessionId: string): Promise<LiftImage[]> {
+  if (ctx.guest) return [];
+  const { data } = await ctx.supabase.from("lift_images").select("id,session_id,storage_path,caption,position").eq("session_id", sessionId).order("position");
+  const rows = (data ?? []).map((r) => ({ id: String(r.id), session_id: String(r.session_id), storage_path: String(r.storage_path), caption: String(r.caption ?? ""), position: Number(r.position) }));
+  if (!rows.length) return rows;
+  const { data: signed } = await ctx.supabase.storage.from("journal-images").createSignedUrls(rows.map((r) => r.storage_path), 60 * 60);
+  const byPath = new Map((signed ?? []).map((d) => [d.path, d.signedUrl]));
+  return rows.map((r) => ({ ...r, url: byPath.get(r.storage_path) ?? undefined }));
 }

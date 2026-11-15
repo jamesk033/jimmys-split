@@ -61,6 +61,9 @@ export async function setUsername(raw: string): Promise<ActionResult> {
 export async function resetWorkouts(confirm: string): Promise<ActionResult> {
   if (confirm.trim().toUpperCase() !== "DELETE") return { ok: false, error: 'Type DELETE to confirm.' };
   const ctx = await getContext();
+  const { data: imgs } = await ctx.supabase.from("lift_images").select("storage_path");
+  const paths = (imgs ?? []).map((i) => String(i.storage_path));
+  for (let i = 0; i < paths.length; i += 100) await ctx.supabase.storage.from("journal-images").remove(paths.slice(i, i + 100));
   const { error } = await ctx.supabase.from("lift_sessions").delete().eq("user_id", ctx.userId);
   revalidatePath("/", "layout");
   return fail(error);
@@ -466,7 +469,37 @@ export async function finishWorkout(id: string): Promise<ActionResult> {
 export async function deleteWorkout(id: string): Promise<ActionResult> {
   if (!uuid.safeParse(id).success) return { ok: false, error: "Unknown workout." };
   const ctx = await getContext();
+  const { data: imgs } = await ctx.supabase.from("lift_images").select("storage_path").eq("session_id", id);
+  if (imgs?.length) await ctx.supabase.storage.from("journal-images").remove(imgs.map((i) => String(i.storage_path)));
   const { error } = await ctx.supabase.from("lift_sessions").delete().eq("id", id);
   revalidatePath("/", "layout");
   return fail(error);
+}
+
+// ---------- workout photos ----------
+
+/** Saves a photo the browser just uploaded to the user's own storage folder. */
+export async function addLiftImage(raw: unknown): Promise<ActionResult> {
+  const p = z.object({ storage_path: z.string().min(3).max(500), session_id: uuid }).safeParse(raw);
+  if (!p.success) return { ok: false, error: "Invalid photo." };
+  const ctx = await getContext();
+  if (ctx.guest) return { ok: false, error: "Make a free account to add photos." };
+  if (!p.data.storage_path.startsWith(`${ctx.userId}/`)) return { ok: false, error: "Invalid photo." };
+  const { data, error } = await ctx.supabase.from("lift_images").insert({ ...p.data, user_id: ctx.userId, position: Date.now() }).select("id").single();
+  return error ? fail(error) : { ok: true, id: data.id };
+}
+
+export async function captionLiftImage(id: string, caption: string): Promise<ActionResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, error: "Invalid photo." };
+  const ctx = await getContext();
+  return fail((await ctx.supabase.from("lift_images").update({ caption: String(caption).slice(0, 500) }).eq("id", id)).error);
+}
+
+export async function deleteLiftImage(id: string): Promise<ActionResult> {
+  if (!uuid.safeParse(id).success) return { ok: false, error: "Invalid photo." };
+  const ctx = await getContext();
+  const { data } = await ctx.supabase.from("lift_images").select("storage_path").eq("id", id).maybeSingle();
+  if (!data) return { ok: false, error: "Photo not found." };
+  await ctx.supabase.storage.from("journal-images").remove([String(data.storage_path)]);
+  return fail((await ctx.supabase.from("lift_images").delete().eq("id", id)).error);
 }

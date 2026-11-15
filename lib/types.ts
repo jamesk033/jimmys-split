@@ -144,3 +144,13 @@ export function normalizeSession(r: Record<string, unknown>): Session {
     finished_at: r.finished_at ? String(r.finished_at) : null,
   };
 }
+
+/** A photo on a workout. `url` is a short-lived signed link. */
+export interface LiftImage {
+  id: string;
+  session_id: string;
+  storage_path: string;
+  caption: string;
+  position: number;
+  url?: string;
+}

@@ -10,3 +10,6 @@ export function browserClient() {
   return client;
 }
 
+
+/** Private storage bucket shared with Jimmy's Journal; each user writes only under their own id. */
+export const IMAGE_BUCKET = "journal-images";

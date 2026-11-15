@@ -5,10 +5,11 @@ import { useMemo, useState, useTransition } from "react";
 import { deleteWorkout, finishWorkout, saveExercise, saveTabOrder, saveWorkout } from "@/app/actions/lift";
 import { groupSets, isDone, setsDone, shouldGoUp, volume, type Best } from "@/lib/lift";
 import { longDate } from "@/lib/time";
-import { type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
+import { type LiftImage, type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight, fromUnit, stepFor, toUnit } from "@/lib/units";
 import { IconCheck, IconDown, IconPlus, IconTrophy, IconUp, IconX } from "./icons";
 import { ConfirmDelete } from "./confirm-delete";
+import { Gallery } from "./gallery";
 import { WorkoutShare } from "./share-cards";
 import { NumField } from "./num-field";
 import { SaveBadge, useAutosave } from "./use-autosave";
@@ -136,6 +137,8 @@ export function WorkoutEditor({
   preview = false,
   tabOrder = [],
   share,
+  images = [],
+  userId,
 }: {
   session: SessionWithSets;
   /** The exercise list (for notes and next-time weights). */
@@ -151,6 +154,10 @@ export function WorkoutEditor({
   tabOrder?: string[];
   /** Finished workouts: username for the picture, and whether the Discord channel is set up. */
   share?: { handle: string; discord: boolean };
+  /** This workout's photos; the first goes on the share picture. */
+  images?: LiftImage[];
+  /** Needed to upload photos (each user has their own storage folder). */
+  userId?: string;
 }) {
   const router = useRouter();
   const live = session.status === "active";
@@ -167,6 +174,7 @@ export function WorkoutEditor({
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
   const [exList, setExList] = useState(split);
+  const [photos, setPhotos] = useState(images);
   const [editing, setEditing] = useState<string | null>(null);
 
   const items = (k: ChecklistKind) => checklist.filter((c) => c.kind === k).sort((a, b) => a.position - b.position);
@@ -512,6 +520,20 @@ export function WorkoutEditor({
         </Card>
       )}
 
+      {userId && !preview ? (
+        <Card title="Photos">
+          <Gallery userId={userId} sessionId={session.id} images={images} onImages={setPhotos} compact />
+        </Card>
+      ) : (
+        photos.length > 0 && (
+          <Card title="Photos">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {photos.map((p) => p.url && <img key={p.id} src={p.url} alt={p.caption || "Workout photo"} className="aspect-[4/5] w-full rounded-lg border border-line object-cover" />)}
+            </div>
+          </Card>
+        )
+      )}
+
       {msg && (
         <p role="alert" className="text-[14px] text-loss">
           {msg}
@@ -528,6 +550,7 @@ export function WorkoutEditor({
           <Card title="Share">
             <WorkoutShare
               filename={`${(session.day_name || "workout").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${date}.png`}
+              photo={photos[0]?.url ?? null}
               discord={share.discord ? { title: `${session.day_name || "Workout"} · ${longDate(date)}`, session: session.id } : null}
               data={{
                 dayName: session.day_name || "Workout",

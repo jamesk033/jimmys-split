@@ -34,7 +34,7 @@ export default async function Preview({ params, searchParams }: { params: Promis
       case "workout":
         return <WorkoutEditor session={d.live} split={d.exercises} checklist={d.checklist} units={units} preview />;
       case "done":
-        return <WorkoutEditor session={d.sessions[0]} split={d.exercises} checklist={d.checklist} units={units} prs={prsIn(d.sessions[0], all)} justFinished nextName={nextDay(d.sessions, d.days)?.name} share={{ handle: "ICT_Jimmy", discord: true }} preview />;
+        return <WorkoutEditor session={d.sessions[0]} split={d.exercises} checklist={d.checklist} units={units} prs={prsIn(d.sessions[0], all)} justFinished nextName={nextDay(d.sessions, d.days)?.name} share={{ handle: "ICT_Jimmy", discord: true }} images={[{ id: "p1", session_id: d.sessions[0].id, storage_path: "x", caption: "", position: 0, url: "/icons/icon-512.png" }]} preview />;
       case "split":
         return <SplitEditor days={d.days} exercises={d.exercises} units={units} preview />;
       case "notes":
