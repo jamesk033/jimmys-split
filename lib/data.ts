@@ -81,7 +81,7 @@ export const getContext = cache(async (): Promise<AppContext> => {
   } = await supabase.auth.getUser();
   if (!user) {
     if ((await cookies()).get(GUEST_COOKIE)?.value === "1")
-      return { supabase, userId: "guest", email: "", username: "guest", guest: true, isAdmin: false, settings: { user_id: "guest", units: "lb", timezone: DEFAULT_TZ, setup: "template", tab_order: [] } };
+      return { supabase, userId: "guest", email: "", username: "guest", guest: true, isAdmin: false, settings: { user_id: "guest", units: "lb", timezone: DEFAULT_TZ, setup: "template", tab_order: [], nav_order: [] } };
     redirect("/login");
   }
 
@@ -108,7 +108,7 @@ export const getContext = cache(async (): Promise<AppContext> => {
     userId: user.id,
     email: user.email ?? "",
     username: (shared?.username as string | null) ?? null,
-    settings: { user_id: user.id, units: row?.units === "kg" ? "kg" : row?.units === "lb" ? "lb" : null, timezone: (row?.timezone as string) || DEFAULT_TZ, setup: row?.setup === "template" || row?.setup === "own" ? row.setup : null, tab_order: Array.isArray(row?.tab_order) ? (row.tab_order as string[]) : [] },
+    settings: { user_id: user.id, units: row?.units === "kg" ? "kg" : row?.units === "lb" ? "lb" : null, timezone: (row?.timezone as string) || DEFAULT_TZ, setup: row?.setup === "template" || row?.setup === "own" ? row.setup : null, tab_order: Array.isArray(row?.tab_order) ? (row.tab_order as string[]) : [], nav_order: Array.isArray(row?.nav_order) ? (row.nav_order as string[]) : [] },
   };
 });
 

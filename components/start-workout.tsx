@@ -1,4 +1,5 @@
 "use client";
+import { titleCase } from "@/lib/title-case";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -56,7 +57,7 @@ export function StartWorkout({
         <Select data-guest-ok id="day" value={dayId} onChange={(e) => setDayId(e.target.value)} className="sm:max-w-xs">
           {days.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.name}
+              {titleCase(d.name)}
               {d.id === next.id ? " (next)" : ""}
             </option>
           ))}
@@ -77,7 +78,7 @@ export function StartWorkout({
               <li key={e.id} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="min-w-0">
                   <span className="block text-[12px] uppercase tracking-wide text-muted">{e.muscle}</span>
-                  <span className="font-semibold">{e.name}</span>
+                  <span className="font-semibold">{titleCase(e.name)}</span>
                   <span className="ml-2 text-[13px] text-muted">{e.reps} reps</span>
                   {e.equipment && (
                     <span className="mt-0.5 flex flex-wrap gap-1">

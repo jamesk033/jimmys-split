@@ -1,3 +1,4 @@
+import { titleCase } from "@/lib/title-case";
 import Link from "next/link";
 import type { WeekCardData } from "@/lib/share-cards";
 import { WeekShare } from "./share-cards";
@@ -11,7 +12,7 @@ export function WeekRecap({ data, discord, filename }: { data: WeekCardData; dis
         <ul className="mb-3 divide-y divide-line">
           {data.workouts.map((w) => (
             <li key={`${w.dateLabel}-${w.dayName}`} className="flex items-baseline justify-between gap-3 py-2">
-              <span className="font-semibold">{w.dayName}</span>
+              <span className="font-semibold">{titleCase(w.dayName)}</span>
               <span className="text-[14px] text-muted">
                 {w.dateLabel} · {w.sets} sets
               </span>

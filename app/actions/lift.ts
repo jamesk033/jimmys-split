@@ -33,6 +33,16 @@ export async function saveTabOrder(order: string[]): Promise<ActionResult> {
   return fail(error);
 }
 
+/** Your order for the sidebar pages (drag in the sidebar). */
+export async function saveNavOrder(order: string[]): Promise<ActionResult> {
+  if (!Array.isArray(order) || order.length > 20 || !order.every((k) => typeof k === "string" && /^[a-z]{1,20}$/.test(k))) return { ok: false, error: "Unknown pages." };
+  const ctx = await getContext();
+  if (ctx.guest) return { ok: false, error: "Sign up to save your order." };
+  const { error } = await ctx.supabase.from("lift_settings").update({ nav_order: order }).eq("user_id", ctx.userId);
+  if (error?.message.includes("nav_order")) return { ok: false, error: "Run the latest SQL step (0007) first." };
+  return fail(error);
+}
+
 export async function setTimezone(tz: string): Promise<ActionResult> {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: tz });
@@ -502,4 +512,23 @@ export async function deleteLiftImage(id: string): Promise<ActionResult> {
   if (!data) return { ok: false, error: "Photo not found." };
   await ctx.supabase.storage.from("journal-images").remove([String(data.storage_path)]);
   return fail((await ctx.supabase.from("lift_images").delete().eq("id", id)).error);
+}
+
+// ---------- public share link ----------
+
+/** Turn a finished workout's public read-only link on (new random link) or off (the old link stops working). */
+export async function setWorkoutShare(id: string, on: boolean): Promise<{ ok: true; token: string | null } | { ok: false; error: string }> {
+  if (!uuid.safeParse(id).success) return { ok: false, error: "Invalid workout." };
+  const ctx = await getContext();
+  if (ctx.guest) return { ok: false, error: "Sign up to share workouts." };
+  const { data: cur, error: e1 } = await ctx.supabase.from("lift_sessions").select("share_token,status").eq("id", id).maybeSingle();
+  if (e1) return { ok: false, error: e1.message.includes("share_token") ? "Run the latest SQL step (0007) first." : e1.message };
+  if (!cur) return { ok: false, error: "Workout not found." };
+  if (cur.status !== "done") return { ok: false, error: "Finish the workout first." };
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const fresh = Array.from(bytes, (b) => "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 56]).join("");
+  const token = on ? ((cur.share_token as string | null) ?? fresh) : null;
+  const { error } = await ctx.supabase.from("lift_sessions").update({ share_token: token }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, token };
 }

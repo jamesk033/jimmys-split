@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { CalendarView } from "@/components/calendar-view";
+import { ConditionsView } from "@/components/conditions-view";
+import { liftConditions } from "@/lib/conditions";
 import { DashboardView } from "@/components/dashboard-view";
 import { HistoryList } from "@/components/history-list";
 import { Nav } from "@/components/nav";
@@ -43,6 +45,8 @@ export default async function Preview({ params, searchParams }: { params: Promis
         return <HistoryList sessions={d.sessions} units={units} />;
       case "calendar":
         return <CalendarView month={today.slice(0, 7)} today={today} sessions={d.sessions} share={{ handle: "ICT_Jimmy", discord: true }} />;
+      case "conditions":
+        return <ConditionsView data={liftConditions(all, d.checklist)} />;
       case "choice":
         return <SplitChoice />;
       case "split-empty":
@@ -57,7 +61,7 @@ export default async function Preview({ params, searchParams }: { params: Promis
   })();
   return (
     <div className="lg:pl-56">
-      <Nav email="@ICT_Jimmy" live={view === "workout"} />
+      <Nav email="@ICT_Jimmy" live={view === "workout"} canEdit />
       <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-5 lg:pb-16">{body}</main>
     </div>
   );

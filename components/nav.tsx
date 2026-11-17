@@ -2,8 +2,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { saveNavOrder } from "@/app/actions/lift";
+import { arrange } from "@/lib/arrange";
+import { Sortable, moveItem } from "./reorder";
 import { cx } from "./ui";
-import { IconCalendar, IconDashboard, IconDumbbell, IconHelp, IconMore, IconNotes, IconSettings, IconSplit, IconTrades, IconX } from "./icons";
+import { IconCalendar, IconDashboard, IconDumbbell, IconEdge, IconHelp, IconMore, IconNotes, IconSettings, IconSplit, IconTrades, IconX } from "./icons";
 
 const ITEMS = [
   { href: "/", label: "Home", icon: IconDashboard },
@@ -11,13 +14,50 @@ const ITEMS = [
   { href: "/calendar", label: "Calendar", icon: IconCalendar },
   { href: "/split", label: "Split", icon: IconSplit },
   { href: "/notes", label: "Key notes", icon: IconNotes },
+  { href: "/conditions", label: "Conditions", icon: IconEdge },
 ];
+const navId = (href: string) => (href === "/" ? "home" : href.slice(1));
+const ordered = (order: string[]) => arrange(ITEMS.map((i) => ({ ...i, id: navId(i.href) })), order);
 const BOTTOM = [
   { href: "/faq", label: "Help", icon: IconHelp },
   { href: "/settings", label: "Settings", icon: IconSettings },
 ];
 
 const active = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
+
+/** The sidebar's main pages in your saved order; drag the grip (shows on hover) to move one. Saves on its own. */
+function SortableLinks({ path, order, canEdit }: { path: string; order: string[]; canEdit: boolean }) {
+  const [items, setItems] = useState(() => ordered(order));
+  return (
+    <nav aria-label="Main">
+      <Sortable
+        items={items}
+        keyOf={(i) => i.id}
+        disabled={!canEdit}
+        label="page"
+        className="gap-1"
+        itemClassName="group flex items-center"
+        onMove={(from, to) => {
+          const next = moveItem(items, from, to);
+          setItems(next);
+          void saveNavOrder(next.map((i) => i.id));
+        }}
+        render={(i, grip) => (
+          <>
+            <Link
+              href={i.href}
+              className={cx("flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-[15px]", active(path, i.href) ? "bg-accent font-semibold text-accent-ink shadow-[0_0_24px_rgba(167,139,250,0.35)]" : "text-muted hover:bg-panel2 hover:text-ink")}
+            >
+              <i.icon />
+              {i.label}
+            </Link>
+            {canEdit && <span className="opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">{grip}</span>}
+          </>
+        )}
+      />
+    </nav>
+  );
+}
 
 function Links({ path, onPick, items = ITEMS, label = "Main" }: { path: string; onPick?: () => void; items?: typeof ITEMS; label?: string }) {
   return (
@@ -44,7 +84,7 @@ const Brand = () => (
 );
 
 /** `live` = a workout is in progress, so the main button says Resume. */
-export function Nav({ email, live = false }: { email: string; live?: boolean }) {
+export function Nav({ email, live = false, order = [], canEdit = false }: { email: string; live?: boolean; order?: string[]; canEdit?: boolean }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path]);
@@ -58,7 +98,7 @@ export function Nav({ email, live = false }: { email: string; live?: boolean }) 
         <Link href="/workout" className={cx("mx-1 flex min-h-11 items-center justify-center gap-2 rounded-lg font-semibold", active(path, "/workout") ? "bg-accent/20 text-accent ring-1 ring-accent" : "bg-accent text-accent-ink")}>
           <IconDumbbell /> {cta}
         </Link>
-        <Links path={path} />
+        <SortableLinks path={path} order={order} canEdit={canEdit} />
         <div className="mt-auto">
           <Links path={path} items={BOTTOM} label="More" />
         </div>
@@ -113,7 +153,7 @@ export function Nav({ email, live = false }: { email: string; live?: boolean }) 
                 <IconX />
               </button>
             </div>
-            <Links path={path} onPick={() => setOpen(false)} />
+            <Links path={path} onPick={() => setOpen(false)} items={ordered(order)} />
             <div className="mt-auto">
               <Links path={path} onPick={() => setOpen(false)} items={BOTTOM} label="More" />
             </div>

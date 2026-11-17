@@ -1,3 +1,4 @@
+import { titleCase } from "@/lib/title-case";
 import { FirstRun } from "@/components/first-run";
 import { DashboardView } from "@/components/dashboard-view";
 import { WeekRecap } from "@/components/week-recap";
@@ -44,7 +45,7 @@ export default async function HomePage() {
           discord={!!hook}
           data={{
             weekLabel,
-            workouts: weekWorkouts.map((s) => ({ dateLabel: shortDate(s.date), dayName: s.day_name || "Workout", sets: setsDone(s.sets) })),
+            workouts: weekWorkouts.map((s) => ({ dateLabel: shortDate(s.date), dayName: titleCase(s.day_name || "Workout"), sets: setsDone(s.sets) })),
             rests: inWeek.filter((s) => s.rest).length,
             setsDone: weekWorkouts.reduce((t, s) => t + setsDone(s.sets), 0),
             volume: fmtBig(weekWorkouts.reduce((t, s) => t + volume(s.sets), 0), units),

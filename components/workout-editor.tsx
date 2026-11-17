@@ -1,4 +1,5 @@
 "use client";
+import { titleCase } from "@/lib/title-case";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -7,12 +8,14 @@ import { groupSets, isDone, setsDone, shouldGoUp, volume, type Best } from "@/li
 import { longDate } from "@/lib/time";
 import { type LiftImage, type ChecklistItem, type ChecklistKind, type Exercise, type SessionWithSets, type SetRow, type Units } from "@/lib/types";
 import { fmtBig, fmtWeight, fromUnit, stepFor, toUnit } from "@/lib/units";
-import { IconCheck, IconDown, IconPlus, IconTrophy, IconUp, IconX } from "./icons";
+import { IconCheck, IconPlus, IconTrophy, IconX } from "./icons";
 import { ConfirmDelete } from "./confirm-delete";
 import { Gallery } from "./gallery";
 import { WorkoutShare } from "./share-cards";
+import { ShareLink } from "./share-link";
 import { NumField } from "./num-field";
 import { SaveBadge, useAutosave } from "./use-autosave";
+import { Sortable, moveItem } from "./reorder";
 import { Badge, Button, Card, Empty, Input, Label, PageHeader, Progress, Textarea, buttonClass, cx } from "./ui";
 
 type Tab = "pre" | "workout" | "post" | "refuel";
@@ -117,7 +120,7 @@ function Checklist({ items, done, onToggle, empty }: { items: ChecklistItem[]; d
               className={cx("flex min-h-14 w-full items-center gap-3 rounded-xl border px-4 text-left text-[16px] transition", on ? "border-win/40 bg-win/10 text-ink" : "border-line bg-bg hover:border-accent/50")}
             >
               <span className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg border", on ? "border-win bg-win text-black" : "border-line")}>{on && <IconCheck width={18} height={18} />}</span>
-              <span className={cx(on && "text-muted line-through decoration-muted/60")}>{i.body}</span>
+              <span className={cx(on && "text-muted line-through decoration-muted/60")}>{titleCase(i.body)}</span>
             </button>
           </li>
         );
@@ -193,9 +196,9 @@ export function WorkoutEditor({
     if (first === "pre" && !(preItems.length && count(preItems, session.pre_done) < preItems.length)) return "workout";
     return first;
   });
-  const moveTab = (i: number, d: -1 | 1) => {
-    const next = [...order];
-    [next[i], next[i + d]] = [next[i + d], next[i]];
+  const moveTab = (from: number, to: number) => {
+    const next = moveItem(order, from, to);
+    if (next === order) return;
     setOrder(next);
     if (!preview)
       saveTabOrder(next)
@@ -277,7 +280,7 @@ export function WorkoutEditor({
     <div className="grid gap-4">
       <PageHeader
         eyebrow={live ? "Workout in progress" : longDate(date)}
-        title={session.day_name || "Workout"}
+        title={titleCase(session.day_name || "Workout")}
         sub={`${doneCount} of ${sets.length} sets done · ${fmtBig(volume(sets), units)} moved`}
         action={!preview && <SaveBadge state={save.state} error={save.error} />}
       />
@@ -285,7 +288,7 @@ export function WorkoutEditor({
       {justFinished && (
         <Card className="border-win/40 bg-win/5">
           <div className="text-[20px] font-bold text-win">Workout done. Rest up.</div>
-          {nextName && <p className="mt-1 text-[14px] text-muted">Next up is {nextName} whenever you&apos;re ready.</p>}
+          {nextName && <p className="mt-1 text-[14px] text-muted">Next up is {titleCase(nextName)} whenever you&apos;re ready.</p>}
         </Card>
       )}
 
@@ -336,20 +339,21 @@ export function WorkoutEditor({
 
       {reordering && (
         <div data-guest-ok className="rounded-2xl border border-accent/50 bg-panel p-3">
-          <p className="mb-2 text-[13px] text-muted">Use the arrows to put the tabs in your order. Saves on its own; tap ⇅ to close.</p>
-          <ol className="grid gap-1.5">
-            {order.map((k, i) => (
-              <li key={k} className="flex items-center gap-1 rounded-xl border border-line bg-bg pl-4 pr-1 text-[15px] font-semibold">
+          <p className="mb-2 text-[13px] text-muted">Drag the grip to put the tabs in your order. Saves on its own; tap ⇅ to close.</p>
+          <Sortable
+            items={order}
+            keyOf={(k) => k}
+            label="tab"
+            className="gap-1.5"
+            itemClassName="flex items-center gap-1 rounded-xl border border-line bg-bg pl-1 pr-3 text-[15px] font-semibold"
+            onMove={moveTab}
+            render={(k, grip) => (
+              <>
+                {grip}
                 <span className="flex-1 py-2.5">{TABS.find((t) => t[0] === k)![1]}</span>
-                <button type="button" aria-label={`Move ${k} up`} disabled={i === 0} onClick={() => moveTab(i, -1)} className="grid h-11 w-10 place-items-center rounded-lg text-muted hover:text-ink disabled:opacity-30">
-                  <IconUp width={18} height={18} />
-                </button>
-                <button type="button" aria-label={`Move ${k} down`} disabled={i === order.length - 1} onClick={() => moveTab(i, 1)} className="grid h-11 w-10 place-items-center rounded-lg text-muted hover:text-ink disabled:opacity-30">
-                  <IconDown width={18} height={18} />
-                </button>
-              </li>
-            ))}
-          </ol>
+              </>
+            )}
+          />
           {orderErr && <p className="mt-2 text-[13px] text-loss">{orderErr}</p>}
         </div>
       )}
@@ -372,7 +376,7 @@ export function WorkoutEditor({
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     {ex?.muscle && <div className="text-[12px] font-semibold uppercase tracking-wide text-accent">{ex.muscle}</div>}
-                    <h2 className="text-[17px] font-semibold">{g.name}</h2>
+                    <h2 className="text-[17px] font-semibold">{titleCase(g.name)}</h2>
                     <div className="text-[13px] text-muted">
                       {g.sets.length} {g.sets.length === 1 ? "set" : "sets"}
                       {g.target ? ` x ${g.target}` : ""}
@@ -551,9 +555,9 @@ export function WorkoutEditor({
             <WorkoutShare
               filename={`${(session.day_name || "workout").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${date}.png`}
               photo={photos[0]?.url ?? null}
-              discord={share.discord ? { title: `${session.day_name || "Workout"} · ${longDate(date)}`, session: session.id, posted: !!session.discord_posted_at, auto: justFinished && !preview } : null}
+              discord={share.discord ? { title: `${titleCase(session.day_name || "Workout")} · ${longDate(date)}`, session: session.id, posted: !!session.discord_posted_at, auto: justFinished && !preview } : null}
               data={{
-                dayName: session.day_name || "Workout",
+                dayName: titleCase(session.day_name || "Workout"),
                 dateLabel: longDate(date),
                 setsDone: doneCount,
                 setsTotal: sets.length,
@@ -564,13 +568,14 @@ export function WorkoutEditor({
                   const ex = g.exerciseId ? splitById.get(g.exerciseId) : undefined;
                   return {
                     muscle: ex?.muscle ?? "",
-                    name: g.name,
+                    name: titleCase(g.name),
                     top: top ? `${fmtWeight(top.weight_lb, units)} x ${top.reps ?? "?"}` : g.sets.some((x) => x.done) ? `${g.sets.find((x) => x.done)?.reps ?? "?"} reps` : "skipped",
                     pr: prs.some((p) => p.name.trim().toLowerCase() === g.name.trim().toLowerCase()),
                   };
                 }),
               }}
             />
+            <ShareLink id={session.id} initial={session.share_token ?? null} disabled={preview} />
           </Card>
         )}
         <div className="flex flex-wrap justify-between gap-2">

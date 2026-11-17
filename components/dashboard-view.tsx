@@ -1,3 +1,4 @@
+import { titleCase } from "@/lib/title-case";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Best, Summary } from "@/lib/lift";
@@ -46,7 +47,7 @@ export function DashboardView({
       >
         <div className="min-w-0">
           <div className="text-[13px] font-semibold uppercase tracking-wider text-muted">{live ? "In progress" : "Next up"}</div>
-          <div className="mt-0.5 text-[26px] font-bold leading-tight">{live ? live.day_name : (next ?? "Set up your split")}</div>
+          <div className="mt-0.5 text-[26px] font-bold leading-tight">{live ? titleCase(live.day_name) : next ? titleCase(next) : "Set up your split"}</div>
           <div className="mt-1 text-[14px] text-muted">
             {live
               ? `${setsDone(live.sets)} of ${live.sets.length} sets done. Tap to keep going.`
@@ -76,7 +77,7 @@ export function DashboardView({
             <ul className="divide-y divide-line">
               {bests.slice(0, 8).map((b) => (
                 <li key={b.name} className="flex items-baseline justify-between gap-3 py-2">
-                  <span className="min-w-0 truncate font-semibold">{b.name}</span>
+                  <span className="min-w-0 truncate font-semibold">{titleCase(b.name)}</span>
                   <span className="shrink-0 text-right text-[14px] text-muted">
                     {fmtWeight(b.weight, units, false)} x {b.reps} · <span className="font-semibold text-ink">{fmtWeight(b.e1rm, units)}</span>
                   </span>
@@ -104,7 +105,7 @@ export function DashboardView({
               <li key={s.id}>
                 <Link href={`/history/${s.id}`} className="flex items-center justify-between gap-3 py-2.5 hover:text-accent">
                   <span className="flex items-center gap-2">
-                    <Badge tone={s.rest ? "neutral" : isLower(s.day_name) ? "win" : "accent"}>{s.day_name || "Workout"}</Badge>
+                    <Badge tone={s.rest ? "neutral" : isLower(s.day_name) ? "win" : "accent"}>{titleCase(s.day_name || "Workout")}</Badge>
                     <span>{shortDate(s.date)}</span>
                   </span>
                   <span className="text-[14px] text-muted">

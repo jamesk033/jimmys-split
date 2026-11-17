@@ -1,4 +1,5 @@
 "use client";
+import { titleCase } from "@/lib/title-case";
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { shortDate } from "@/lib/time";
@@ -23,7 +24,7 @@ export function ProgressChart({ series, units }: { series: ProgressSeries; units
       <Select data-guest-ok aria-label="Lift" value={name} onChange={(e) => setName(e.target.value)} className="sm:max-w-xs">
         {names.map((n) => (
           <option key={n} value={n}>
-            {n}
+            {titleCase(n)}
           </option>
         ))}
       </Select>

@@ -1,3 +1,4 @@
+import { titleCase } from "@/lib/title-case";
 import Link from "next/link";
 import { groupSets, setsDone, volume } from "@/lib/lift";
 import { longDate } from "@/lib/time";
@@ -24,7 +25,7 @@ export function HistoryList({ sessions, units }: { sessions: SessionWithSets[]; 
               <Card>
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Badge tone={isLower(s.day_name) ? "win" : "accent"}>{s.day_name || "Workout"}</Badge>
+                    <Badge tone={isLower(s.day_name) ? "win" : "accent"}>{titleCase(s.day_name || "Workout")}</Badge>
                     <span className="font-semibold">{longDate(s.date)}</span>
                     {s.status === "active" && <Badge tone="warn">In progress</Badge>}
                   </div>
@@ -38,7 +39,7 @@ export function HistoryList({ sessions, units }: { sessions: SessionWithSets[]; 
                     const top = done.sort((a, b) => (b.weight_lb ?? 0) - (a.weight_lb ?? 0))[0];
                     return (
                       <li key={g.key} className="flex justify-between gap-3">
-                        <span className="truncate text-muted">{g.name}</span>
+                        <span className="truncate text-muted">{titleCase(g.name)}</span>
                         <span className="shrink-0 tabular-nums">{top ? `${fmtWeight(top.weight_lb, units)} x ${top.reps ?? "?"}` : "skipped"}</span>
                       </li>
                     );

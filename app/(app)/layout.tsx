@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const gate = !ctx.username ? <UsernameForm first /> : !ctx.settings.units ? <UnitsPicker current={null} first /> : !ctx.settings.setup ? <SplitChoice /> : null;
   return (
     <div className="lg:pl-56">
-      <Nav live={!!live} email={ctx.guest ? "Guest" : ctx.username ? `@${ctx.username}` : ctx.email} />
+      <Nav live={!!live} email={ctx.guest ? "Guest" : ctx.username ? `@${ctx.username}` : ctx.email} order={ctx.settings.nav_order} canEdit={!ctx.guest} />
       <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-5 lg:pb-16">
         {ctx.guest && <GuestGate />}
         {gate ?? children}

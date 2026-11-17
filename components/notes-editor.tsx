@@ -4,83 +4,81 @@ import { useEffect, useState, useTransition } from "react";
 import { deleteChecklistItem, deleteNote, reorder, saveChecklistItem, saveNote } from "@/app/actions/lift";
 import { KIND_LABEL, type ChecklistItem, type ChecklistKind, type Note } from "@/lib/types";
 import { ConfirmDelete } from "./confirm-delete";
-import { IconDown, IconTrash, IconUp } from "./icons";
+import { titleCase } from "@/lib/title-case";
+import { IconTrash } from "./icons";
+import { Sortable, moveItem } from "./reorder";
 import { SaveBadge, useAutosave } from "./use-autosave";
 import { Button, Card, Empty, Input, PageHeader, Textarea, buttonClass } from "./ui";
 
 const KINDS: ChecklistKind[] = ["pre", "post", "refuel"];
 
-function Mover({ label, first, last, onMove, onDelete }: { label: string; first: boolean; last: boolean; onMove: (d: -1 | 1) => void; onDelete: () => void | Promise<void> }) {
+function Remove({ label, onDelete }: { label: string; onDelete: () => void | Promise<void> }) {
   return (
-    <div className="flex shrink-0">
-      <button type="button" aria-label={`Move ${label} up`} disabled={first} onClick={() => onMove(-1)} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-ink disabled:opacity-30">
-        <IconUp width={18} height={18} />
-      </button>
-      <button type="button" aria-label={`Move ${label} down`} disabled={last} onClick={() => onMove(1)} className="grid h-11 w-9 place-items-center rounded-lg text-muted hover:text-ink disabled:opacity-30">
-        <IconDown width={18} height={18} />
-      </button>
-      <ConfirmDelete label={`Delete ${label}`} onConfirm={onDelete} className="min-h-11 min-w-9">
-        <IconTrash width={18} height={18} />
-      </ConfirmDelete>
-    </div>
+    <ConfirmDelete label={`Delete ${label}`} onConfirm={onDelete} className="min-h-11 min-w-9 shrink-0">
+      <IconTrash width={18} height={18} />
+    </ConfirmDelete>
   );
 }
 
 function useOrdered<T extends { id: string }>(list: T[]) {
   const [order, setOrder] = useState(list);
   useEffect(() => setOrder(list), [list]);
-  const swap = (i: number, d: -1 | 1) => {
-    const next = [...order];
-    [next[i], next[i + d]] = [next[i + d], next[i]];
+  const move = (from: number, to: number) => {
+    const next = moveItem(order, from, to);
     setOrder(next);
     return next;
   };
-  return [order, setOrder, swap] as const;
+  return [order, setOrder, move] as const;
 }
 
-function NoteRow({ note, first, last, onMove, onDelete }: { note: Note; first: boolean; last: boolean; onMove: (d: -1 | 1) => void; onDelete: () => void }) {
+function NoteRow({ note, grip, onDelete }: { note: Note; grip: React.ReactNode; onDelete: () => void }) {
   const [v, setV] = useState({ title: note.title, body: note.body });
   const save = useAutosave({ id: note.id, title: v.title.trim() || note.title, body: v.body }, saveNote);
   return (
-    <li className="grid gap-2 rounded-xl border border-line bg-bg p-3">
+    <div className="grid min-w-0 flex-1 gap-2">
       <div className="flex items-center gap-2">
+        {grip}
         <Input aria-label="Section title" value={v.title} onChange={(e) => setV({ ...v, title: e.target.value })} maxLength={80} className="font-semibold" />
-        <Mover label={v.title} first={first} last={last} onMove={onMove} onDelete={onDelete} />
+        <Remove label={v.title} onDelete={onDelete} />
       </div>
       <Textarea aria-label={`${v.title} text`} value={v.body} onChange={(e) => setV({ ...v, body: e.target.value })} maxLength={5000} className="min-h-32" />
       {save.state !== "idle" && <SaveBadge state={save.state} error={save.error} />}
-    </li>
+    </div>
   );
 }
 
-function ItemRow({ item, first, last, onMove, onDelete }: { item: ChecklistItem; first: boolean; last: boolean; onMove: (d: -1 | 1) => void; onDelete: () => void }) {
+function ItemRow({ item, grip, onDelete }: { item: ChecklistItem; grip: React.ReactNode; onDelete: () => void }) {
   const [body, setBody] = useState(item.body);
   const save = useAutosave({ id: item.id, kind: item.kind, body: body.trim() || item.body }, saveChecklistItem);
   return (
-    <li className="flex items-center gap-2">
+    <>
+      {grip}
       <Input aria-label="Checklist item" value={body} onChange={(e) => setBody(e.target.value)} maxLength={200} className={save.state === "error" ? "border-loss" : undefined} />
-      <Mover label={body} first={first} last={last} onMove={onMove} onDelete={onDelete} />
-    </li>
+      <Remove label={body} onDelete={onDelete} />
+    </>
   );
 }
 
 function ChecklistCard({ kind, items, editing }: { kind: ChecklistKind; items: ChecklistItem[]; editing: boolean }) {
   const router = useRouter();
-  const [order, setOrder, swap] = useOrdered(items);
+  const [order, setOrder, move] = useOrdered(items);
   const [text, setText] = useState("");
   const [pending, start] = useTransition();
   return (
     <Card title={KIND_LABEL[kind]}>
       {editing ? (
         <>
-          <ul className="grid gap-2">
-            {order.map((it, i) => (
+          <Sortable
+            items={order}
+            keyOf={(it) => it.id}
+            label="item"
+            className="gap-2"
+            itemClassName="flex items-center gap-1"
+            onMove={(from, to) => start(async () => void (await reorder("lift_checklist_items", move(from, to).map((x) => x.id))))}
+            render={(it, grip) => (
               <ItemRow
-                key={it.id}
                 item={it}
-                first={i === 0}
-                last={i === order.length - 1}
-                onMove={(d) => start(async () => void (await reorder("lift_checklist_items", swap(i, d).map((x) => x.id))))}
+                grip={grip}
                 onDelete={() =>
                   start(async () => {
                     const res = await deleteChecklistItem(it.id);
@@ -88,8 +86,8 @@ function ChecklistCard({ kind, items, editing }: { kind: ChecklistKind; items: C
                   })
                 }
               />
-            ))}
-          </ul>
+            )}
+          />
           <form
             className="mt-3 flex gap-2"
             onSubmit={(e) => {
@@ -115,7 +113,7 @@ function ChecklistCard({ kind, items, editing }: { kind: ChecklistKind; items: C
           {order.map((it, i) => (
             <li key={it.id} className="flex gap-3 text-[15px]">
               <span className="w-5 shrink-0 text-right tabular-nums text-muted">{i + 1}.</span>
-              <span>{it.body}</span>
+              <span>{titleCase(it.body)}</span>
             </li>
           ))}
         </ol>
@@ -129,7 +127,7 @@ function ChecklistCard({ kind, items, editing }: { kind: ChecklistKind; items: C
 export function NotesEditor({ notes, checklist, preview = false }: { notes: Note[]; checklist: ChecklistItem[]; preview?: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [order, setOrder, swap] = useOrdered(notes);
+  const [order, setOrder, move] = useOrdered(notes);
   const [pending, start] = useTransition();
 
   return (
@@ -146,14 +144,17 @@ export function NotesEditor({ notes, checklist, preview = false }: { notes: Note
 
       {editing ? (
         <Card title="Sections">
-          <ul className="grid gap-3">
-            {order.map((n, i) => (
+          <Sortable
+            items={order}
+            keyOf={(n) => n.id}
+            label="section"
+            className="gap-3"
+            itemClassName="flex rounded-xl border border-line bg-bg p-3"
+            onMove={(from, to) => start(async () => void (await reorder("lift_notes", move(from, to).map((x) => x.id))))}
+            render={(n, grip) => (
               <NoteRow
-                key={n.id}
                 note={n}
-                first={i === 0}
-                last={i === order.length - 1}
-                onMove={(d) => start(async () => void (await reorder("lift_notes", swap(i, d).map((x) => x.id))))}
+                grip={grip}
                 onDelete={() =>
                   start(async () => {
                     const res = await deleteNote(n.id);
@@ -161,8 +162,8 @@ export function NotesEditor({ notes, checklist, preview = false }: { notes: Note
                   })
                 }
               />
-            ))}
-          </ul>
+            )}
+          />
           <Button
             variant="subtle"
             className="mt-3"
@@ -180,7 +181,7 @@ export function NotesEditor({ notes, checklist, preview = false }: { notes: Note
       ) : order.length ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {order.map((n) => (
-            <Card key={n.id} title={n.title}>
+            <Card key={n.id} title={titleCase(n.title)}>
               {n.body.trim() ? <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{n.body}</p> : <p className="text-[14px] text-muted">Empty. Tap Edit to fill it in.</p>}
             </Card>
           ))}

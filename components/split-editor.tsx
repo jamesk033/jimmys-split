@@ -1,4 +1,5 @@
 "use client";
+import { titleCase } from "@/lib/title-case";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
@@ -172,7 +173,7 @@ function DayCard({ day, index, grip, exercises, units, onDeleted, preview }: { d
                   <button data-guest-ok type="button" onClick={() => setEditing(open ? null : key)} aria-expanded={open} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left">
                     <span className="min-w-0 flex-1">
                       {e.muscle && <span className="block text-[11px] uppercase tracking-wide text-muted">{e.muscle}</span>}
-                      <span className="block truncate text-[15px]">{e.name}</span>
+                      <span className="block truncate text-[15px]">{titleCase(e.name)}</span>
                     </span>
                     <span className="shrink-0 text-right text-[13px] tabular-nums text-muted">
                       {fmtWeight(e.weight_lb, units)}
@@ -463,7 +464,7 @@ function ExerciseRow({ ex, units, onDelete, preview, dayNames = [] }: { ex: Exer
       <button data-guest-ok type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-14 w-full items-center gap-2 rounded-xl px-4 text-left">
         <span className="min-w-0 flex-1">
           <span className="block text-[11px] uppercase tracking-wide text-muted">{ex.muscle || "No muscle"}</span>
-          <span className="block truncate font-semibold">{ex.name}</span>
+          <span className="block truncate font-semibold">{titleCase(ex.name)}</span>
           {dayNames.length > 0 && <span className="block truncate text-[12px] text-muted">On {dayNames.join(", ")}</span>}
         </span>
         <span className="shrink-0 text-[13px] tabular-nums text-muted">{fmtWeight(ex.weight_lb, units)}</span>
@@ -540,7 +541,7 @@ function ExerciseList({ exercises, days, units, preview }: { exercises: Exercise
                       onClick={() => setOnDays((x) => (on ? x.filter((y) => y !== d.id) : [...x, d.id]))}
                       className={cx("min-h-10 rounded-lg border px-3 text-[14px]", already ? "border-amber-400/50 bg-amber-400/10 text-amber-300" : on ? "border-accent bg-accent/15 font-semibold text-ink" : "border-line bg-bg text-muted hover:text-ink")}
                     >
-                      {d.name}
+                      {titleCase(d.name)}
                       {already && " ✓"}
                     </button>
                   );

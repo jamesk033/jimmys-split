@@ -104,6 +104,29 @@ describe("lift schema", () => {
     expect((await as(A, `select * from lift_images`)).rows).toHaveLength(1);
   });
 
+  it("shares a finished workout by link only, with earlier bests for PRs", async () => {
+    // user_settings belongs to Jimmy's Journal (same database); a stub here.
+    await db.exec(`create table if not exists public.user_settings (user_id uuid primary key, username text);`);
+    await db.exec(`insert into public.user_settings values ('${A}', 'ict_jimmy') on conflict do nothing;`);
+    const m = readFileSync(path.join(__dirname, "../supabase/migrations/0007_links_nav.sql"), "utf8");
+    await db.exec(m);
+    await db.exec(m);
+    await as(A, `update lift_sessions set status = 'done', date = '2026-11-01' where id = 'aaaaaaaa-0000-4000-8000-000000000001'`);
+    await as(A, `insert into lift_sessions (id, date, day_name, status, started_at) values ('aaaaaaaa-0000-4000-8000-000000000002', '2026-11-03', 'A Upper 1', 'done', '2026-11-03T15:00:00Z')`);
+    await as(A, `insert into lift_sets (session_id, name, weight_lb, reps) values ('aaaaaaaa-0000-4000-8000-000000000002', 'Bench', 325, 3)`);
+    const off = await as(B, `select shared_workout('abcdefghijklmnop12') as w`);
+    expect((off.rows[0] as { w: unknown }).w).toBeNull();
+    await as(A, `update lift_sessions set share_token = 'abcdefghijklmnop12' where id = 'aaaaaaaa-0000-4000-8000-000000000002'`);
+    await expect(as(B, `update lift_sessions set share_token = 'x' where id = 'aaaaaaaa-0000-4000-8000-000000000002' returning id`)).resolves.toMatchObject({ rows: [] });
+    await db.exec(`grant execute on function public.shared_workout(text) to anon;`);
+    const got = await as(B, `select shared_workout('abcdefghijklmnop12') as w`);
+    const w = (got.rows[0] as { w: { username: string; sets: { name: string }[]; prior: Record<string, number> } }).w;
+    expect(w.username).toBe("ict_jimmy");
+    expect(w.sets.map((x) => x.name)).toEqual(["Bench"]);
+    expect(Math.round(w.prior.bench)).toBe(347);
+    await as(A, `update lift_settings set nav_order = array['history','/'] where user_id = '${A}'`);
+  });
+
     it("rejects units other than lb or kg", async () => {
     await as(B, `insert into lift_settings (units) values ('kg')`);
     await expect(as(B, `update lift_settings set units = 'stone'`)).rejects.toThrow();

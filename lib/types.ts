@@ -11,6 +11,8 @@ export interface LiftSettings {
   setup: "template" | "own" | null;
   /** Workout tab order, e.g. ["workout", "pre", "post", "refuel"]. Empty = default. */
   tab_order: string[];
+  /** Sidebar page order (0007). Empty = default. */
+  nav_order: string[];
 }
 
 /** One lift in the exercise list. Weight lives here so it carries across every day that uses it. */
@@ -78,6 +80,8 @@ export interface Session {
   finished_at: string | null;
   /** Set when the workout picture went to the Discord channel (0005). */
   discord_posted_at?: string | null;
+  /** Public read-only link /l/<token>, null = off (0007). */
+  share_token?: string | null;
 }
 
 export interface SessionWithSets extends Session {
@@ -144,6 +148,8 @@ export function normalizeSession(r: Record<string, unknown>): Session {
     notes: String(r.notes ?? ""),
     started_at: String(r.started_at ?? ""),
     finished_at: r.finished_at ? String(r.finished_at) : null,
+    discord_posted_at: r.discord_posted_at ? String(r.discord_posted_at) : null,
+    share_token: r.share_token ? String(r.share_token) : null,
   };
 }
 
